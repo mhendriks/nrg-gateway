@@ -30,7 +30,7 @@
 void setup() {
   Debug::begin(115200);
   Debug::usbbegin(115200);
-  Debug::usbprintf("NRG Gateway Firmware | %s | %s ( %s %s )\n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
+  Debug::usbprintf("NRG Gateway Firmware | %s | %s - %s %s \n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
 
   StatusLed::begin();
   Storage::begin();
@@ -45,7 +45,6 @@ void setup() {
 }
 
 void loop() {
-  P1::loopHighPrio();            // keep this light (no blocking)
   MQTT::loop();
   Web::loop();
   Storage::loop();
