@@ -1,8 +1,10 @@
 #include "Config.h"
 #include <WiFi.h>
 
-#if !ARDUINO_USB_CDC_ON_BOOT
-  HWCDC HWCDCSerial;
+// #if  defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+#if  !ARDUINO_USB_CDC_ON_BOOT
+  // #include <USB.h>
+  HWCDC USBSerial;
 #endif
 
 namespace Config {

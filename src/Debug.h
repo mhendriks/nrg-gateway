@@ -1,5 +1,11 @@
 #pragma once
 
+#if  ARDUINO_USB_CDC_ON_BOOT
+  #define USBSerial Serial
+#else 
+  extern HWCDC USBSerial;
+#endif
+
 namespace Debug {
   inline void begin(uint32_t baud=115200) { Serial.begin(baud); while(!Serial) { delay(1);} }
   inline void print(const char* s) { Serial.print(s); }
@@ -7,4 +13,8 @@ namespace Debug {
   inline void println() { Serial.println(); }
   template<typename... Args>
   inline void printf(const char* fmt, Args... args) { Serial.printf(fmt, args...); }
+  
+  inline void usbbegin(uint32_t baud=115200) { USBSerial.begin(baud); }
+  template<typename... Args>
+  inline void usbprintf(const char* fmt, Args... args) { USBSerial.printf(fmt, args...); }
 }

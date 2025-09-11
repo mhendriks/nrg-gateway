@@ -44,7 +44,6 @@ static void ensureConnected() {
                    t_avail().c_str(), 0, true, "offline")) {
     Debug::println("[MQTT] Connected");
     mqtt.publish(t_avail().c_str(), "online", true);
-    mqtt.subscribe(t_cmd("+").c_str()); // wildcard won't work in PubSubClient; subscribe each if needed
     mqtt.subscribe(t_cmd("reboot").c_str());
     mqtt.subscribe(t_cmd("ota").c_str());
     mqtt.subscribe(t_cmd("cfg/set").c_str());

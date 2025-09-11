@@ -29,9 +29,8 @@
 
 void setup() {
   Debug::begin(115200);
-  
-  HWCDCSerial.begin(115200);
-  HWCDCSerial.printf("NRG Gateway Firmware | %s | %s ( %s %s )\n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
+  Debug::usbbegin(115200);
+  Debug::usbprintf("NRG Gateway Firmware | %s | %s ( %s %s )\n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
 
   StatusLed::begin();
   Storage::begin();
