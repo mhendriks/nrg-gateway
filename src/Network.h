@@ -11,7 +11,7 @@
 
 #include "Debug.h"      // gebruikt: Debug::println / Debug::printf
 #include "Config.h"     // voor defines/profielen
-void write2Log(const char* topic, const char* msg, bool alsoSerial); // al aanwezig bij jou
+// void write2Log(const char* topic, const char* msg, bool alsoSerial); // al aanwezig bij jou
 
 enum class NetworkProfile : uint8_t {
   WiFiOnly,
@@ -24,7 +24,7 @@ enum class NetState : uint8_t {
 };
 
 struct PortalCfg {
-  const char* ssid_prefix = "NRG-Setup-";
+  const char* ssid_prefix = "NRG-GW-Setup-";
   const char* password    = "";   // liever instellen in productie
   IPAddress ap_ip   {192,168,4,1};
   IPAddress ap_gw   {192,168,4,1};
@@ -50,12 +50,26 @@ public:
   bool isOnline() const { return _state == NetState::ONLINE; }
   bool wifiUp()   const { return (WiFi.status() == WL_CONNECTED); }
   bool ethUp()    const;
-
+  
+  const char* linkStr() const;  // "eth" | "wifi" | "offline"
+  String      ipStr()   const;  // "x.x.x.x"
+  // (optioneel, als je 'm gebruikt ergens:)
+  int         wifiRSSI() const; // dBm of 0 als niet op Wi-Fi
+  
   // Toegang tot config (bijv. om UI te tonen)
   NetCfg& cfg() { return _cfg; }
 
 private:
-  // helpers
+    // helpers
+    bool     _staBeginIssued = false;
+bool     _staAuthFailed  = false;
+uint32_t _staBeginMs     = 0;
+uint8_t  _staFailCount   = 0;
+  bool _wifiPrepared = false;
+  bool _authLatch = false;        // blokkeert auto-close bij fout WW
+bool _pendingTrySTA = false;    // vraag om direct STA te proberen na /save
+
+  void _prepareWifiOnce();
   void _loadCfg();
   void _saveCfg();
   void _startWifiSTA();
@@ -81,8 +95,8 @@ private:
   PortalCfg  _portal;
   NetCfg     _cfg;
 
-  DNSServer      _dns;
-  AsyncWebServer _server{80};
+  AsyncWebServer* _server = nullptr;
+  DNSServer*      _dns    = nullptr;
   Preferences    _prefs;
   bool           _portalRunning = false;
 };

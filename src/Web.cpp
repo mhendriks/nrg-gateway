@@ -8,7 +8,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 
-static AsyncWebServer server(80);
+static AsyncWebServer server(81);
 static AsyncWebServer rawSrv(82);
 static AsyncWebSocket ws("/ws");
 
@@ -25,8 +25,8 @@ static void handleNow(AsyncWebServerRequest *req) {
   doc["water_l"] = P1::waterL();
   doc["solar_w"] = P1::solarW();
   JsonObject net = doc.createNestedObject("net");
-  net["link"] = Networks::link();
-  net["ip"] = Networks::ip();
+  net["link"] = NetworkMgr::instance().linkStr();
+  net["ip"] = NetworkMgr::instance().ipStr();
 
   String out; serializeJson(doc, out);
   req->send(200, "application/json", out);

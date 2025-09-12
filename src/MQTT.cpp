@@ -35,7 +35,8 @@ static void onMessage(char* topic, byte* payload, unsigned int len) {
 
 static void ensureConnected() {
   if (mqtt.connected()) return;
-  if (!Networks::connected()) return;
+  if (!NetworkMgr::instance().isOnline()) return;
+
 
   mqtt.setServer(Config::mqtt.host.c_str(), Config::mqtt.port);
   Debug::printf("[MQTT] Connecting to %s:%u ...\n", Config::mqtt.host.c_str(), Config::mqtt.port);
@@ -84,8 +85,8 @@ namespace MQTT {
     doc["water_l"] = P1::waterL();
     doc["solar_w"] = P1::solarW();
     JsonObject net = doc.createNestedObject("net");
-    net["link"] = Networks::link();
-    net["ip"] = Networks::ip();
+    net["link"] = NetworkMgr::instance().linkStr();
+    net["ip"] = NetworkMgr::instance().ipStr();
     String out; serializeJson(doc, out);
     mqtt.publish(t_state().c_str(), out.c_str(), false);
   }
