@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "esp_task_wdt.h"
 
 namespace P1 {
   using RawSink = void (*)(const char*, size_t);

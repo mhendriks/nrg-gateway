@@ -4,7 +4,7 @@
 #if !ARDUINO_USB_CDC_ON_BOOT
   extern HWCDC USBSerial;   // je had dit al — oké zolang definitie in één .cpp staat
 #endif
-\
+
 namespace Config {
   struct NetCfg {
     String ssid, pass;

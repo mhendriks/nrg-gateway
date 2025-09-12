@@ -56,8 +56,6 @@ namespace {
   P1::RawSink rawSink = nullptr;
   MyData dsmrData = {};
 
-  // snapshot (protected by a short critical section)
-  // float s_power=0, s_t1=0, s_t2=0, s_t1r=0, s_t2r=0, s_gas=0, s_water=0, s_solar=0;
   portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
   // offline thresholds
@@ -213,9 +211,10 @@ namespace {
 
     const TickType_t idleTick = pdMS_TO_TICKS(2);
     s_run = true;
-
+    esp_task_wdt_add(NULL);
     while (s_run) {
       auto& SER = Config::p1Serial();
+      esp_task_wdt_reset();
       if (SER.available() <= 0) { vTaskDelay(idleTick); continue; }
 
       // Fill buffer as data arrives

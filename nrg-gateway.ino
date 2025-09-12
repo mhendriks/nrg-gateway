@@ -26,12 +26,32 @@
 #include "src/Button.h"
 #include "src/OTAfw.h"
 #include "src/EspNow.h"
+#include "esp_task_wdt.h"
+
+
+void SetupWDT(){
+  esp_task_wdt_deinit();
+  esp_task_wdt_config_t cfg = {
+    .timeout_ms = 15000, //in 15sec default 
+    // .idle_core_mask = (1<<0) | (1<<1), //S3 watch idle core 0 & 1
+    // .idle_core_mask = (1<<0), //C3 watch idle core 0 
+    .idle_core_mask = 0, //idle core watch dog OFF
+#ifdef DEBUG
+    .trigger_panic = true
+#else
+    .trigger_panic = false
+#endif
+  };
+  esp_task_wdt_init(&cfg);
+  esp_task_wdt_add(NULL);
+}
 
 void setup() {
   Debug::begin(115200);
   Debug::usbbegin(115200);
   Debug::usbprintf("NRG Gateway Firmware | %s | %s - %s %s \n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
-
+  SetupWDT();
+  
   StatusLed::begin();
   Storage::begin();
   Config::load();                 // load NVS / defaults
@@ -41,7 +61,7 @@ void setup() {
   MQTT::begin();                  // connect broker, publish LWT online
   Button::begin();                // ISR-safe, actions via queue
   EspNow::maybeBegin();           // optional
-  OTAfw::begin();                 // optional hooks
+  OTAfw::begin();              // optional hooks
 }
 
 void loop() {
@@ -51,4 +71,5 @@ void loop() {
   OTAfw::loop();
   StatusLed::loop();
   Button::loop();
+  esp_task_wdt_reset();
 }

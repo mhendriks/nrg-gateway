@@ -41,10 +41,11 @@ namespace Networks {
     if (!isEthUp) {
       Debug::printf("[NET] WiFi connecting to '%s' ...\n", Config::net.ssid.c_str());
       WiFi.mode(WIFI_STA);
+      WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
       if (Config::net.hostname.length()) WiFi.setHostname(Config::net.hostname.c_str());
       WiFi.begin(Config::net.ssid.c_str(), Config::net.pass.c_str());
       uint32_t t0 = millis();
-      while (WiFi.status()!=WL_CONNECTED && (millis()-t0)<15000) { delay(100); }
+      while (WiFi.status()!=WL_CONNECTED && (millis()-t0)<15000) { delay(100); esp_task_wdt_reset();}
       if (WiFi.status()==WL_CONNECTED) {
         Debug::printf("[NET] WiFi OK, ip=%s\n", WiFi.localIP().toString().c_str());
       } else {
