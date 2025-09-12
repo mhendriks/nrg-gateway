@@ -17,6 +17,8 @@ namespace Config {
     // Voorbeeld: eFuse/hw-type → pins kiezen
     // if (/* S3 Ultra */) { hw.p1_rx_pin=16; hw.p1_uart=1; }
     // if (/* C3 */)      { hw.p1_rx_pin=7;  hw.p1_uart=1; }
+     net.pass = "gualchiera";
+     net.ssid = ">>ADD39.IT<< ";
   }
 
   String deviceId() {

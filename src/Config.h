@@ -5,10 +5,26 @@
   extern HWCDC USBSerial;   // je had dit al — oké zolang definitie in één .cpp staat
 #endif
 
+// Kies één (via build flag of hier hard-coded):
+// #define NET_PROFILE_WIFI_ONLY
+// #define NET_PROFILE_ETH_ONLY
+// #define NET_PROFILE_ULTRA   // ETH preferred + Wi-Fi fallback + SoftAP portal
+
+#ifndef NET_PROFILE_WIFI_ONLY
+#ifndef NET_PROFILE_ETH_ONLY
+#ifndef NET_PROFILE_ULTRA
+  #define NET_PROFILE_ULTRA
+#endif
+#endif
+#endif
+
+// Optioneel: portal wachtwoord leeg = open; liever iets instellen in productie
+#define PORTAL_PASSWORD   ""   // bv. "setup1234"
+
 namespace Config {
   struct NetCfg {
     String ssid, pass;
-    String hostname = "nrg-gw";
+    String hostname = "nrg-gateway";
     bool use_eth = false; // set by eFuse/hw-profile
   };
 

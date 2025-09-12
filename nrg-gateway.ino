@@ -29,6 +29,7 @@
 #include "esp_task_wdt.h"
 
 
+
 void SetupWDT(){
   esp_task_wdt_deinit();
   esp_task_wdt_config_t cfg = {
@@ -55,7 +56,7 @@ void setup() {
   StatusLed::begin();
   Storage::begin();
   Config::load();                 // load NVS / defaults
-  Networks::begin();               // Wi-Fi / Ethernet + NTP
+  NetworkMgr::instance().setup(NetworkProfile::Ultra /* of WiFiOnly/EthOnly */);
   P1::begin();                    // DSMR parser (stub)
   Web::begin();                   // HTTP + WebSockets + RAW:82
   MQTT::begin();                  // connect broker, publish LWT online
@@ -71,5 +72,6 @@ void loop() {
   OTAfw::loop();
   StatusLed::loop();
   Button::loop();
+  NetworkMgr::instance().tick();
   esp_task_wdt_reset();
 }
