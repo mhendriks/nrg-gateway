@@ -16,7 +16,7 @@
 enum class NetworkProfile : uint8_t {
   WiFiOnly,
   EthOnly,
-  Ultra  // beide; Ethernet preferred
+  Ultra  // both; Ethernet preferred
 };
 
 enum class NetState : uint8_t {
@@ -50,6 +50,7 @@ public:
   bool isOnline() const { return _state == NetState::ONLINE; }
   bool wifiUp()   const { return (WiFi.status() == WL_CONNECTED); }
   bool ethUp()    const;
+  void forgetWifiCreds(bool reboot = false);
   
   const char* linkStr() const;  // "eth" | "wifi" | "offline"
   String      ipStr()   const;  // "x.x.x.x"

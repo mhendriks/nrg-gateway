@@ -42,7 +42,24 @@ namespace Config {
   int   p1_dtr_pin = -1;  // optioneel DTR fix pin (INPUT_PULLDOWN); -1 = niet gebruikt
   };
 
+ struct IoCfg {
+    int   btn_pin         = 0;   // -1 = geen knop
+    int   led_pin         = 2;   // -1 = geen (mono) LED
+    bool  btn_active_low  = true;
+    bool  led_active_high = true;
+    bool  led_is_rgb      = false; // Ultras = true, alle andere = false
+  };
 
+  struct BtnCfg {
+    uint32_t debounce_ms        = 40;
+    uint32_t short_ms           = 500;
+    uint32_t long_ms            = 2000;
+    uint32_t very_long_ms       = 6000;
+    uint32_t preview_period_ms  = 800;
+  };
+
+  extern IoCfg  io; 
+  extern BtnCfg btn;
   extern NetCfg net;
   extern MqttCfg mqtt;
   extern HwCfg  hw;           // <<< NIEUW

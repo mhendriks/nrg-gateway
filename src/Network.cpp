@@ -605,3 +605,31 @@ String NetworkMgr::ipStr() const {
 int NetworkMgr::wifiRSSI() const {
   return wifiUp() ? WiFi.RSSI() : 0;
 }
+
+void NetworkMgr::forgetWifiCreds(bool reboot) {
+  // Stop eventuele connectie/portal
+  WiFi.disconnect(true, true);     // stop STA en vergeet runtime keys
+  if (_portalRunning) _stopPortal();
+
+  // Wis alleen de credentials
+  if (_prefs.begin("netcfg", false)) {
+    _prefs.remove("ssid");
+    _prefs.remove("pass");
+    _prefs.end();
+  }
+  // Update runtime config
+  _cfg.ssid = "";
+  _cfg.pass = "";
+  _staBeginIssued = false;
+  _staAuthFailed  = false;
+  _authLatch      = false;
+
+  // (optioneel) ook de IDF WiFi-NVS resetten (veilig, zelfs als niets daar staat)
+  esp_wifi_restore();
+
+  // Terug naar portal flow
+  _state = NetState::START_PORTAL;
+  _t0 = millis();
+
+  if (reboot) { delay(50); ESP.restart(); }
+}

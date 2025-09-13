@@ -22,7 +22,7 @@
 #include "src/Web.h"
 #include "src/MQTT.h"
 #include "src/Storage.h"
-#include "src/StatusLed.h"
+#include "src/Led.h"
 #include "src/Button.h"
 #include "src/OTAfw.h"
 #include "src/EspNow.h"
@@ -51,8 +51,8 @@ void setup() {
   Debug::usbbegin(115200);
   Debug::usbprintf("NRG Gateway Firmware | %s | %s - %s %s \n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
   SetupWDT();
-  
-  StatusLed::begin();
+  Led::begin();
+  // StatusLed::begin();
   Storage::begin();
   Config::load();                 // load NVS / defaults
   NetworkMgr::instance().setup(NetworkProfile::Ultra /* of WiFiOnly/EthOnly */);
@@ -68,8 +68,9 @@ void loop() {
   // MQTT::loop();
   // Web::loop();
   Storage::loop();
+  Led::loop();
   // OTAfw::loop();
-  StatusLed::loop();
+  // StatusLed::loop();
   Button::loop();
   NetworkMgr::instance().tick();
   esp_task_wdt_reset();

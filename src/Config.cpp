@@ -8,17 +8,23 @@
 #endif
 
 namespace Config {
+  
   NetCfg net;
   MqttCfg mqtt;
-  HwCfg  hw;           // <<< definitie
+  HwCfg  hw;   
+  IoCfg   io;      
+  BtnCfg  btn;
 
   void load() {
     // TODO: load from NVS / JSON
     // Voorbeeld: eFuse/hw-type → pins kiezen
     // if (/* S3 Ultra */) { hw.p1_rx_pin=16; hw.p1_uart=1; }
     // if (/* C3 */)      { hw.p1_rx_pin=7;  hw.p1_uart=1; }
-     net.pass = "gualchiera";
-     net.ssid = ">>ADD39.IT<< ";
+    #ifdef CONFIG_IDF_TARGET_ESP32S3
+      io.led_is_rgb = true;
+      io.btn_pin = 0;
+      io.led_pin = 42;  
+    #endif
   }
 
   String deviceId() {
