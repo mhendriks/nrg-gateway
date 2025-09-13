@@ -14,6 +14,7 @@ namespace P1 {
   bool   isV5();
   bool   hasFix();
   bool   offline();
+  bool    newTelegram();
   uint32_t lastTelegramMs();
   uint32_t intervalMs();
   const char* versionStr();
@@ -25,6 +26,8 @@ namespace P1 {
   float t1rKWh(); float t2rKWh();
   float gasM3();  float waterL();
   float solarW();
+
+  extern String RawTelegram;
 
   // Hooks
   void onRaw(RawSink cb);

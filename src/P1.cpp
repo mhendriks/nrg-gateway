@@ -51,6 +51,7 @@ namespace {
   static constexpr size_t BUF_MAX = 2048;
   char   buf[BUF_MAX];
   size_t blen = 0;
+  bool   NewTelegram = false;
 
   // raw callback
   P1::RawSink rawSink = nullptr;
@@ -259,6 +260,8 @@ namespace {
 
           // parse
           (void)parseDSMR(buf, end);
+          P1::RawTelegram = buf; //copy last raw telegram
+          NewTelegram = true;
           gotFrame = true;
 
           // shift remainder forward
@@ -275,6 +278,8 @@ namespace {
 
 namespace P1 {
 
+  String RawTelegram;
+
   bool isV5() { return (s_P1BaudRate == 115200) && s_checksumEnabled; }
 
   void begin() {
@@ -290,6 +295,11 @@ namespace P1 {
     s_run = false;
     // The task will self-delete. We intentionally don't join here to keep API simple.
     // Optionally, add a wait with timeout if you need a synchronous stop.
+  }
+
+  bool newTelegram(){
+    return NewTelegram;
+    NewTelegram = false;
   }
 
   bool running(){ return s_task != nullptr; }

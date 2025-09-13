@@ -19,15 +19,14 @@
 
 #include "src/Network.h"
 #include "src/P1.h"
-#include "src/Web.h"
 #include "src/MQTT.h"
 #include "src/Storage.h"
 #include "src/Led.h"
 #include "src/Button.h"
 #include "src/OTAfw.h"
 #include "src/EspNow.h"
+#include "src/Web.h"
 #include "esp_task_wdt.h"
-
 
 void SetupWDT(){
   esp_task_wdt_deinit();
@@ -57,18 +56,24 @@ void setup() {
   Config::load();                 // load NVS / defaults
   NetworkMgr::instance().setup(NetworkProfile::Ultra /* of WiFiOnly/EthOnly */);
   P1::begin();                    // DSMR parser (stub)
-  // Web::begin();                   // HTTP + WebSockets + RAW:82
+  Web::begin();                   // HTTP + WebSockets + RAW:82
   // MQTT::begin();                  // connect broker, publish LWT online
   Button::begin();                // ISR-safe, actions via queue
   // EspNow::maybeBegin();           // optional
   // OTAfw::begin();              // optional hooks
 }
 
+void QueueLoop(){
+  //todo in worker
+  Web::rawPrint();
+}
+
 void loop() {
   // MQTT::loop();
-  // Web::loop();
+  Web::loop();
   Storage::loop();
   Led::loop();
+  QueueLoop();
   // OTAfw::loop();
   // StatusLed::loop();
   Button::loop();

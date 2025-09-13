@@ -1,3 +1,4 @@
+#include "Led.h"
 #include "Network.h"
 #include <esp_wifi.h>   // <-- NODIG voor esp_wifi_get_mode
 
@@ -451,6 +452,7 @@ if (_state == NetState::PORTAL_RUN && _dns) _dns->processNextRequest();
     case NetState::ETH_WAIT: {
       if (ethUp()) {
         // write2Log("NET","online_eth",true);
+         Led::setOn(true);
         Debug::println(F("[NET] ETH ONLINE"));
         _state = NetState::ONLINE; _retries = 0;
         break;
@@ -475,6 +477,7 @@ if (_state == NetState::PORTAL_RUN && _dns) _dns->processNextRequest();
     case NetState::WIFI_WAIT: {
   if (wifiUp()) {
     // LOG_NET("online_wifi");
+    Led::setOn(true);
     Debug::printf("[NET] WIFI ONLINE ip=%s rssi=%d\n",
                   WiFi.localIP().toString().c_str(), WiFi.RSSI());
     _state = NetState::ONLINE; _retries = 0; _staFailCount = 0; _staAuthFailed = false; _staBeginIssued=false;
@@ -509,6 +512,7 @@ if (_state == NetState::PORTAL_RUN && _dns) _dns->processNextRequest();
         // write2Log("NET","offline",true);
         Debug::println(F("[NET] OFFLINE"));
         _state = NetState::BACKOFF; _t0 = millis();
+        Led::setOn(false);
       }
     } break;
 

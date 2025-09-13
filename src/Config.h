@@ -26,6 +26,7 @@ namespace Config {
     String ssid, pass;
     String hostname = "nrg-gateway";
     bool use_eth = false; // set by eFuse/hw-profile
+    bool use_port_82 = false;
   };
 
   struct MqttCfg {

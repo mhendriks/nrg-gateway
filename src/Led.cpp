@@ -17,13 +17,15 @@ static void writeMono(bool on) {
 
 void begin() {
   if (LED_PIN() >= 0) { pinMode(LED_PIN(), OUTPUT); writeMono(false); }
-  if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(0,0,0);
+  if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(0,0,255);
   mode = Mode::OFF; t0 = millis();
+  delay(1000);
+  setOn(false);
 }
 
-void setOn(bool on) {
+void setOn(bool on) { //blue led of blue rgb on/off
   mode = on ? Mode::ON : Mode::OFF;
-  if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(on?255:0, on?255:0, on?255:0);
+  if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(0, 0, on?255:0);
   else writeMono(on);
 }
 
@@ -44,7 +46,7 @@ void loop() {
 
   switch (mode) {
     case Mode::OFF: writeMono(false); if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(0,0,0); break;
-    case Mode::ON:  writeMono(true);  if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(255,255,255); break;
+    case Mode::ON:  writeMono(true);  if (LED_IS_RGB() && (&SetRGB != nullptr)) SetRGB(0,0,255); break;
 
     case Mode::PREVIEW_SHORT:
     case Mode::PREVIEW_LONG:

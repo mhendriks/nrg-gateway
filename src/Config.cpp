@@ -24,6 +24,7 @@ namespace Config {
       io.led_is_rgb = true;
       io.btn_pin = 0;
       io.led_pin = 42;  
+      net.use_port_82 = true; //test
     #endif
   }
 

@@ -62,13 +62,13 @@ public:
 
 private:
     // helpers
-    bool     _staBeginIssued = false;
-bool     _staAuthFailed  = false;
-uint32_t _staBeginMs     = 0;
-uint8_t  _staFailCount   = 0;
+  bool     _staBeginIssued = false;
+  bool     _staAuthFailed  = false;
+  uint32_t _staBeginMs     = 0;
+  uint8_t  _staFailCount   = 0;
   bool _wifiPrepared = false;
   bool _authLatch = false;        // blokkeert auto-close bij fout WW
-bool _pendingTrySTA = false;    // vraag om direct STA te proberen na /save
+  bool _pendingTrySTA = false;    // vraag om direct STA te proberen na /save
 
   void _prepareWifiOnce();
   void _loadCfg();
