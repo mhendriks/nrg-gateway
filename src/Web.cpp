@@ -2,8 +2,13 @@
 #include "Network.h"
 #include "P1.h"
 #include "Debug.h"
+#include "version.h"
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <WiFiClient.h>
+#include <LittleFS.h>
+
 
 namespace {
   AsyncWebServer* g_srv = nullptr;
@@ -119,6 +124,55 @@ static void onNewClient(void*, AsyncClient* c) {
     ws.cleanupClients();
   }
 
+#define HOST_DATA_FILES     "cdn.jsdelivr.net"
+#define PATH_DATA_FILES     "https://cdn.jsdelivr.net/gh/mhendriks/nrg-gateway@" STR(_VERSION_MAJOR) "." STR(_VERSION_MINOR) "/data"
+#define URL_INDEX_FALLBACK  "https://cdn.jsdelivr.net/gh/mhendriks/nrg-gateway@latest/data"
+
+void GetFile(String filename, String path ){
+  
+  WiFiClient wifiClient;
+  HTTPClient http;
+
+  if(wifiClient.connect(HOST_DATA_FILES, 443)) {
+    Debug::println(String(path + filename).c_str());
+      http.begin(path + filename);
+      int httpResponseCode = http.GET();
+//      Serial.print(F("HTTP Response code: "));Serial.println(httpResponseCode);
+      if (httpResponseCode == 200 ){
+        String payload = http.getString();
+  //      Serial.println(payload);
+        File file = LittleFS.open(filename, "w"); // open for reading and writing
+        if (!file) Debug::println(F("open file FAILED!!!\r\n"));
+        else file.print(payload); 
+        file.close();
+      }
+      http.end(); 
+      wifiClient.stop(); //end client connection to server  
+  } else {
+    Debug::println(F("connection to server failed"));
+  }
+}
+
+void checkIndexFile(){
+  if (!LittleFS.exists("/index.html") ) {
+    Debug::println(F("Oeps! Index file not pressent, try to download it!"));
+    GetFile("/index.html", PATH_DATA_FILES); //download file from cdn
+    if (!LittleFS.exists("/index.html") ) {
+      Debug::println(F("Oeps! Index file not pressent, try to download it!\r"));
+      GetFile("/index.html", URL_INDEX_FALLBACK);
+    }
+    if (!LittleFS.exists("/index.html") ) { //check again
+      Debug::println(F("Index file still not pressent!\r"));
+      }
+  }
+ 
+  // if (!LittleFS.exists("/Frontend.json", false) ) {
+  //   DebugTln(F("Frontend.json not pressent, try to download it!"));
+  //   GetFile("/Frontend.json", PATH_DATA_FILES);
+  // }
+
+  }
+
   void begin() {
     if (g_started) return;
 
@@ -127,12 +181,18 @@ static void onNewClient(void*, AsyncClient* c) {
       Debug::println("[WEB] Net not up yet; postpone start");
       return; // in Web::loop nog eens proberen
     }
+    
+    // LittleFS.remove("/index.html");
+    // LittleFS.remove("/index.html.gz");
+    checkIndexFile();
 
     g_srv = new AsyncWebServer(80);
     g_srv->on("/api/v1/now", HTTP_GET, handleNow);
-    g_srv->on("/", HTTP_GET, [](auto* req){
-      req->send(200, "text/plain", "NRG Gateway v6 skeleton - UI placeholder");
-    });
+    g_srv->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    
+    // g_srv->on("/", HTTP_GET, [](auto* req){
+    //   req->send(200, "text/plain", "NRG Gateway v6 skeleton - UI placeholder");
+    // });
 
     //webserver
     g_srv->begin();
