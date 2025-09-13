@@ -12,9 +12,7 @@ namespace {
 
 static AsyncServer rawSrv(82);
 static std::vector<AsyncClient*> rawClients;
-
-// static NetServer ws_raw(82);
-// static AsyncWebSocket ws("/ws");
+static AsyncWebSocket ws("/ws");
 
 // handlers zoals je al had...
 static void handleNow(AsyncWebServerRequest* req) {
@@ -39,7 +37,7 @@ static void handleNow(AsyncWebServerRequest* req) {
 static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
                       void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-    Debug::printf("[WS] Client %u connected\n", client->id());
+    Debug::printf("[WS] Client %u connected total %u\n", client->id(), server->count() );
   } else if (type == WS_EVT_DISCONNECT) {
     Debug::printf("[WS] Client %u disconnected\n", client->id());
   } else if (type == WS_EVT_DATA) {
@@ -47,43 +45,44 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
   }
 }
 
-// namespace Web {
-//   void begin() {
-//     // ws.onEvent(onWsEvent);
-//     // server.addHandler(&ws);
-
-//     // REST
-//     server.on("/api/v1/now", HTTP_GET, handleNow);
-//     server.on("/", HTTP_GET, [](AsyncWebServerRequest *req){
-//       req->send(200, "text/plain", "NRG Gateway v6 skeleton - UI placeholder");
-//     });
-
-//     // RAW :82
-//     // rawSrv.on("/", HTTP_GET, [](AsyncWebServerRequest *req){
-//     //   req->send(200, "text/plain", "RAW DSMR stream placeholder\n");
-//     // });
-
-//     server.begin();
-//     // rawSrv.begin();
-//     Debug::println("[WEB] HTTP 80 + WS + RAW 82 up");
-//   }
-
-//   void loop() {
-//     // push periodic WS update (lightweight example)
-//     static uint32_t t0=0;
-//     if (millis()-t0>1000) {
-//       t0 = millis();
-//       StaticJsonDocument<256> doc;
-//       doc["ts"] = (uint32_t)time(nullptr);
-//       doc["power_w"] = P1::powerW();
-//       String out; serializeJson(doc, out);
-//       // ws.textAll(out);
-//     }
-//   }
-// }
-
 namespace Web {
   bool isStarted() { return g_started; }
+
+// ---- Websocket START
+
+static String jsonPack(const char* type, void (*fill)(JsonObject)) {
+  JsonDocument doc;
+  // JsonObject root = doc.to<JsonObject>();
+  doc["type"] = type;                        // berichttype
+  doc["proto"] = 1;
+  doc["ts"]   = (uint32_t)time(nullptr);     // optioneel: timestamp
+  doc["seq"]  = (uint32_t)esp_random();      // optioneel: sequence/id
+  JsonObject data = doc.createNestedObject("data");
+  if (fill) fill(data);
+  String out; serializeJson(doc, out);
+  return out;
+}
+
+  static void wsSendTo(AsyncWebSocketClient* c, const char* type, void (*fill)(JsonObject)) {
+  if (c && c->status() == WS_CONNECTED) c->text(jsonPack(type, fill));
+}
+
+static void wsBroadcast(const char* type, void (*fill)(JsonObject)) {
+  ws.textAll(jsonPack(type, fill));
+}
+
+// ————— Voorbeelden van zenden
+void pushTelemetry() {
+  wsBroadcast("telemetry", [](JsonObject d){
+    d["power_w"] = P1::powerW();
+    JsonObject e = d.createNestedObject("energy");
+    e["t1_kwh"] = P1::t1kWh();
+    e["t2_kwh"] = P1::t2kWh();
+  });
+}
+// ---- Websocket END
+
+// PORT 82
 
 static void removeClient(AsyncClient* c) {
   auto it = std::find(rawClients.begin(), rawClients.end(), c);
@@ -103,19 +102,21 @@ static void onNewClient(void*, AsyncClient* c) {
   c->onError([](void*, AsyncClient* c, int8_t){ removeClient(c); }, nullptr);
   c->onData(onClientData, nullptr);
   rawClients.push_back(c);
-  c->write("Welcome\r\n", 9);
+  // c->write("Welcome\r\n", 9);
 }
 
   void rawPrint() {
     if ( !P1::newTelegram() ) return;
     P1::clearNewTelegram();
-    Debug::println("raw print");
+    // Debug::println("raw print");
     for (auto* c : rawClients) {
       if (c && c->connected()) {
         c->write(P1::RawTelegram.c_str(), P1::RawTelegram.length());
         c->write((const char*)"\r\n", 2); //extra line feed
       }
     }
+    wsBroadcast("raw_telegram", [](JsonObject d){ d["text"] = P1::RawTelegram; });
+    ws.cleanupClients();
   }
 
   void begin() {
@@ -133,28 +134,23 @@ static void onNewClient(void*, AsyncClient* c) {
       req->send(200, "text/plain", "NRG Gateway v6 skeleton - UI placeholder");
     });
 
+    //webserver
     g_srv->begin();
     g_started = true;
     
-    //start port 82 
-    // ws_raw.begin();
+    //port 82
     rawSrv.onClient(onNewClient, nullptr);
     rawSrv.begin();
+    
+    //websocket
+    ws.onEvent(onWsEvent);
+    g_srv->addHandler(&ws);
 
-    Debug::println("[WEB] HTTP 80 + 82 up");
+    Debug::println("[WEB] HTTP 80 + 82 + WS up");
   }
 
   void loop() {
-    // Als netwerk later online komt, alsnog starten
-    if (!g_started && NetworkMgr::instance().isOnline()) {
-      begin();
-    }
-    // hier evt. je WS broadcast timer
+    if (!g_started && NetworkMgr::instance().isOnline()) begin();
   }
-
-  // void PrintPort82(){
-  //   //print telegram to dongle port 82
-  //   if ( Config::net.use_port_82 ) ws_raw.println( P1::RawTelegram ); 
-  // }
 
 }
