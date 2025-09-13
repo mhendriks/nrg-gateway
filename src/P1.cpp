@@ -297,9 +297,11 @@ namespace P1 {
     // Optionally, add a wait with timeout if you need a synchronous stop.
   }
 
+  void clearNewTelegram(){
+    NewTelegram = false;
+  }
   bool newTelegram(){
     return NewTelegram;
-    NewTelegram = false;
   }
 
   bool running(){ return s_task != nullptr; }

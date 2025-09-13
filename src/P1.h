@@ -15,6 +15,7 @@ namespace P1 {
   bool   hasFix();
   bool   offline();
   bool    newTelegram();
+  void   clearNewTelegram();
   uint32_t lastTelegramMs();
   uint32_t intervalMs();
   const char* versionStr();

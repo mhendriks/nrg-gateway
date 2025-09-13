@@ -108,6 +108,7 @@ static void onNewClient(void*, AsyncClient* c) {
 
   void rawPrint() {
     if ( !P1::newTelegram() ) return;
+    P1::clearNewTelegram();
     Debug::println("raw print");
     for (auto* c : rawClients) {
       if (c && c->connected()) {
@@ -116,7 +117,6 @@ static void onNewClient(void*, AsyncClient* c) {
       }
     }
   }
-
 
   void begin() {
     if (g_started) return;
