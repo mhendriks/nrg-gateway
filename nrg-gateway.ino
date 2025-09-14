@@ -1,4 +1,9 @@
 /*
+TODO: 
+- Setup WDT andere plek geven
+*/
+
+/*
   NRG Gateway Firmware (v6) - Skeleton
   ------------------------------------
   Arduino IDE project skeleton with modular file layout.

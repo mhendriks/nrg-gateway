@@ -1,6 +1,7 @@
 #include "Led.h"
 #include "Network.h"
-#include <esp_wifi.h>   // <-- NODIG voor esp_wifi_get_mode
+#include <esp_wifi.h>
+#include "Time.h"
 
 
 static IPAddress parseIP(const String& s){ IPAddress ip; ip.fromString(s); return ip; }
@@ -399,21 +400,22 @@ void NetworkMgr::setup(NetworkProfile profile) {
   }
 
   WiFi.onEvent([this](WiFiEvent_t ev, WiFiEventInfo_t info){
-  if (ev == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-    auto r = info.wifi_sta_disconnected.reason;
-    if (r == WIFI_REASON_AUTH_FAIL || r == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT || r == WIFI_REASON_AUTH_EXPIRE) {
-      _staAuthFailed = true;
-      _authLatch = true;              // blokkeer auto-close
+    if (ev == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+      auto r = info.wifi_sta_disconnected.reason;
+      if (r == WIFI_REASON_AUTH_FAIL || r == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT || r == WIFI_REASON_AUTH_EXPIRE) {
+        _staAuthFailed = true;
+        _authLatch = true;              // blokkeer auto-close
+      }
+      _staBeginIssued = false;
+    } else if (ev == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+      _staAuthFailed = false;
+      _authLatch = false;               // <--- bij succes weer vrijgeven
+      _staFailCount = 0;
     }
-    _staBeginIssued = false;
-  } else if (ev == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-    _staAuthFailed = false;
-    _authLatch = false;               // <--- bij succes weer vrijgeven
-    _staFailCount = 0;
-  }
-});
+  });
 
   _t0 = millis();
+  TimeInitOnce();
   Debug::printf("[NET] setup profile=%d\n", (int)_profile);
 }
 
@@ -452,7 +454,8 @@ if (_state == NetState::PORTAL_RUN && _dns) _dns->processNextRequest();
     case NetState::ETH_WAIT: {
       if (ethUp()) {
         // write2Log("NET","online_eth",true);
-         Led::setOn(true);
+        Led::setOn(true);
+        TimeKickOnNetworkUp();
         Debug::println(F("[NET] ETH ONLINE"));
         _state = NetState::ONLINE; _retries = 0;
         break;
@@ -478,6 +481,7 @@ if (_state == NetState::PORTAL_RUN && _dns) _dns->processNextRequest();
   if (wifiUp()) {
     // LOG_NET("online_wifi");
     Led::setOn(true);
+    TimeKickOnNetworkUp();
     Debug::printf("[NET] WIFI ONLINE ip=%s rssi=%d\n",
                   WiFi.localIP().toString().c_str(), WiFi.RSSI());
     _state = NetState::ONLINE; _retries = 0; _staFailCount = 0; _staAuthFailed = false; _staBeginIssued=false;

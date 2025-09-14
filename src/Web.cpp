@@ -115,7 +115,7 @@ static String jsonPack(const char* type, void (*fill)(JsonObject)) {
   JsonDocument doc;
   // JsonObject root = doc.to<JsonObject>();
   doc["type"] = type;                        // berichttype
-  doc["proto"] = 1;
+  doc["ver"] = 1;
   doc["ts"]   = (uint32_t)time(nullptr);     // optioneel: timestamp
   doc["seq"]  = (uint32_t)esp_random();      // optioneel: sequence/id
   JsonObject data = doc.createNestedObject("data");
@@ -124,7 +124,7 @@ static String jsonPack(const char* type, void (*fill)(JsonObject)) {
   return out;
 }
 
-  static void wsSendTo(AsyncWebSocketClient* c, const char* type, void (*fill)(JsonObject)) {
+static void wsSendTo(AsyncWebSocketClient* c, const char* type, void (*fill)(JsonObject)) {
   if (c && c->status() == WS_CONNECTED) c->text(jsonPack(type, fill));
 }
 
@@ -211,25 +211,19 @@ void GetFile(String filename, String path ){
   }
 }
 
-void checkIndexFile(){
-  if (!LittleFS.exists("/index.html") ) {
+void checkFileExist(const char* file){
+  if (!LittleFS.exists(file) ) {
     Debug::println(F("Oeps! Index file not pressent, try to download it!"));
-    GetFile("/index.html", PATH_DATA_FILES); //download file from cdn
-    if (!LittleFS.exists("/index.html") ) {
+    GetFile(file, PATH_DATA_FILES); //download file from cdn
+    if (!LittleFS.exists(file) ) {
       Debug::println(F("Oeps! Index file not pressent, try to download it!\r"));
-      GetFile("/index.html", URL_INDEX_FALLBACK);
+      GetFile(file, URL_INDEX_FALLBACK);
     }
-    if (!LittleFS.exists("/index.html") ) { //check again
+    if (!LittleFS.exists(file) ) { //check again
       Debug::println(F("Index file still not pressent!\r"));
       }
   }
- 
-  // if (!LittleFS.exists("/Frontend.json", false) ) {
-  //   DebugTln(F("Frontend.json not pressent, try to download it!"));
-  //   GetFile("/Frontend.json", PATH_DATA_FILES);
-  // }
-
-  }
+}
 
   void begin() {
     if (g_started) return;
@@ -239,14 +233,18 @@ void checkIndexFile(){
       Debug::println("[WEB] Net not up yet; postpone start");
       return; // in Web::loop nog eens proberen
     }
-    
+    const char* indexFile = "/index-dev.html";
+
     LittleFS.remove("/index.html");
-    checkIndexFile();
+    LittleFS.remove(indexFile);
+
+    checkFileExist(indexFile);
+    // checkFileExist("/Frontend.json");
 
     g_srv = new AsyncWebServer(80);
     g_srv->on("/api/v1/now", HTTP_GET, handleNow);
     g_srv->on("/api/listfiles", HTTP_GET, ListFiles);
-    g_srv->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    g_srv->serveStatic("/", LittleFS, "/").setDefaultFile(indexFile);
     
     // g_srv->on("/", HTTP_GET, [](auto* req){
     //   req->send(200, "text/plain", "NRG Gateway v6 skeleton - UI placeholder");

@@ -1,3 +1,10 @@
+/*
+
+TODO: 
+- toevoegen van long_ms 
+
+*/
+
 #pragma once
 #include <Arduino.h>
 
@@ -26,7 +33,7 @@ void __attribute__((weak)) OnShort();      // default: reboot
 void __attribute__((weak)) OnLong();       // default: ESP-NOW pairing placeholder
 void __attribute__((weak)) OnVeryLong();   // default: WiFi erase + reboot
 
-// Ultras (RGB) optionele hook
+// Ultra (RGB) optional hook
 // void LedSetRGB(uint8_t r, uint8_t g, uint8_t b);
 
 } // namespace Button

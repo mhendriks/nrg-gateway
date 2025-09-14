@@ -1,7 +1,6 @@
 #include "Button.h"
 #include "Led.h"
 #include "Config.h"
-#include <WiFi.h>
 #include "Network.h"
 
 namespace Button {
@@ -42,8 +41,6 @@ void begin(){
   timings.long_ms           = Config::btn.long_ms;
   timings.very_long_ms      = Config::btn.very_long_ms;
   timings.preview_period_ms = Config::btn.preview_period_ms;
-
-  Led::begin();
 
   if (BTN_PIN()>=0){
     pinMode(BTN_PIN(), BTN_AL()?INPUT_PULLUP:INPUT);

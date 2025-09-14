@@ -12,7 +12,7 @@ namespace Debug {
   inline void print(const char* s) { Serial.print(s); }
   inline void println(const char* s) { Serial.println(s); }
   inline void println() { Serial.println(); }
-  // === Nieuw: overloads voor F("...") / __FlashStringHelper ===
+  
   inline void print(const __FlashStringHelper* s) { Serial.print(s); }
   inline void println(const __FlashStringHelper* s) { Serial.println(s); }
 
