@@ -1252,15 +1252,15 @@ function SendNetSwitchJson() {
 	 while (list.hasChildNodes()) {  
 	   list.removeChild(list.firstChild);
 	 }
-    
-	 nFilecount = json.length - 1; //last object is general information
+    	
+	 nFilecount = json.files.length;
      let dir = '<table id="FSTable" width=90%>';
-	   for (var i = 0; i < json.length - 1; i++) {
+	   for (var i = 0; i < json.files.length; i++) {
 		 dir += "<tr>";
-		 dir += `<td width=250px nowrap><a href ="${json[i].name}" target="_blank">${json[i].name}</a></td>`;
-		 dir += `<td width=100px nowrap><small>${json[i].size}</small></td>`;
-		 dir += `<td width=100px nowrap><a href ="${json[i].name}"download="${json[i].name}"> Download </a></td>`;
-		 dir += `<td width=100px nowrap><a href ="${json[i].name}?delete=/${json[i].name}"> Delete </a></td>`;
+		 dir += `<td width=250px nowrap><a href ="${json.files[i].name}" target="_blank">${json.files[i].name}</a></td>`;
+		 dir += `<td width=100px nowrap><small>${json.files[i].size}</small></td>`;
+		 dir += `<td width=100px nowrap><a href ="${json.files[i].name}"download="${json.files[i].name}"> Download </a></td>`;
+		 dir += `<td width=100px nowrap><a href ="${json.files[i].name}?delete=/${json.files[i].name}"> Delete </a></td>`;
 		 dir += "</tr>";
 	   }	// for ..
 	   main.insertAdjacentHTML('beforeend', dir);
@@ -1272,8 +1272,8 @@ function SendNetSwitchJson() {
 	   main.insertAdjacentHTML('beforeend', '</table>');
 //        main.insertAdjacentHTML('beforeend', `<div id='filecount'>Aantal bestanden: ${nFilecount} </div>`);
        main.insertAdjacentHTML('beforeend', `<div id='filecount'>${t('lbl-fm-files')}: ${nFilecount} </div>`);       
-	   main.insertAdjacentHTML('beforeend', `<p id="FSFree">${t('lbl-fm-storage')}: <b>${json[i].usedBytes} ${t('lbl-fm-used')}</b> | ${json[i].totalBytes} ${t('lbl-fm-total')}`);
-	   free = json[i].freeBytes;
+	   main.insertAdjacentHTML('beforeend', `<p id="FSFree">${t('lbl-fm-storage')}: <b>${json.fs.usedBytes} ${t('lbl-fm-used')}</b> | ${json.fs.totalBytes} ${t('lbl-fm-total')}`);
+	   free = json.fs.freeBytes;
 	   fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
 	   Spinner(false);
 	 });	// function(json)

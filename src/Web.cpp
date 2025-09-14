@@ -8,7 +8,8 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <LittleFS.h>
-
+#include <vector>
+#include <algorithm>
 
 namespace {
   AsyncWebServer* g_srv = nullptr;
@@ -36,6 +37,61 @@ static void handleNow(AsyncWebServerRequest* req) {
   net["link"] = NetworkMgr::instance().linkStr();
   net["ip"]   = NetworkMgr::instance().ipStr();
   String out; serializeJson(doc, out);
+  req->send(200, "application/json", out);
+}
+
+static void ListFiles(AsyncWebServerRequest* req) {
+  struct Entry { String name; uint32_t size; };
+  std::vector<Entry> list;
+  list.reserve(30);
+
+  // Lees directory
+  File root = LittleFS.open("/");
+  if (!root) {
+    JsonDocument err;
+    err["error"] = "Failed to open LittleFS root";
+    String out; serializeJson(err, out);
+    req->send(500, "application/json", out);
+    return;
+  }
+
+  for (File f = root.openNextFile(); f && list.size() < 30; f = root.openNextFile()) {
+    if (f.isDirectory()) continue;
+    Entry e{ String(f.name()), static_cast<uint32_t>(f.size()) };
+    list.push_back(std::move(e));
+  }
+
+  // Sorteer alfabetisch (case-insensitive)
+  std::sort(list.begin(), list.end(), [](const Entry& a, const Entry& b) {
+    String al = a.name, bl = b.name;
+    al.toLowerCase(); bl.toLowerCase();
+    return al < bl;
+  });
+
+  // FS stats (met 5% “safety headroom” zoals je oude code)
+  const uint64_t used = LittleFS.usedBytes();
+  const uint64_t total = LittleFS.totalBytes();
+  const uint64_t usedHeadroom = (used * 105 + 99) / 100;  // 1.05 afgerond
+  const uint64_t freeBytes = (total > usedHeadroom) ? (total - usedHeadroom) : 0;
+
+  // Bouw JSON
+  JsonDocument doc;  // ArduinoJson v7 -> dynamisch
+  auto files = doc["files"].to<JsonArray>();
+  for (const auto& e : list) {
+    auto item = files.add<JsonObject>();
+    item["name"] = e.name;
+    item["size"] = e.size;  // bytes (integer)
+  }
+
+  auto fs = doc["fs"].to<JsonObject>();
+  fs["usedBytes"] = used;                 // raw
+  fs["usedBytesWithHeadroom"] = usedHeadroom; // used * 1.05
+  fs["totalBytes"] = total;
+  fs["freeBytes"] = freeBytes;
+
+  // Stuur response
+  String out;
+  serializeJson(doc, out);
   req->send(200, "application/json", out);
 }
 
@@ -128,6 +184,8 @@ static void onNewClient(void*, AsyncClient* c) {
 #define PATH_DATA_FILES     "https://cdn.jsdelivr.net/gh/mhendriks/nrg-gateway@" STR(_VERSION_MAJOR) "." STR(_VERSION_MINOR) "/data"
 #define URL_INDEX_FALLBACK  "https://cdn.jsdelivr.net/gh/mhendriks/nrg-gateway@latest/data"
 
+// #define URL_INDEX_FALLBACK  "http://localhost/~martijn/nrg-gateway/dev" //TEST ONLY
+
 void GetFile(String filename, String path ){
   
   WiFiClient wifiClient;
@@ -182,12 +240,12 @@ void checkIndexFile(){
       return; // in Web::loop nog eens proberen
     }
     
-    // LittleFS.remove("/index.html");
-    // LittleFS.remove("/index.html.gz");
+    LittleFS.remove("/index.html");
     checkIndexFile();
 
     g_srv = new AsyncWebServer(80);
     g_srv->on("/api/v1/now", HTTP_GET, handleNow);
+    g_srv->on("/api/listfiles", HTTP_GET, ListFiles);
     g_srv->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
     
     // g_srv->on("/", HTTP_GET, [](auto* req){
