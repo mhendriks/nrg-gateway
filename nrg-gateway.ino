@@ -4,9 +4,9 @@ TODO:
 */
 
 /*
-  NRG Gateway Firmware (v6) - Skeleton
+  NRG Gateway Firmware (aka dsmr-api v6)
   ------------------------------------
-  Arduino IDE project skeleton with modular file layout.
+  Arduino IDE project with modular layout.
   - AsyncWebServer + WebSockets
   - MQTT topics (nrg/<device>/...)
   - Storage (ring-files stubs)
@@ -14,8 +14,6 @@ TODO:
   - Status LED + Button (stubs)
   - OTA (stubs)
   - ESP-NOW (stubs)
-
-  NOTE: This is a buildable starting point if dependencies are installed.
 */
 
 #include "src/Config.h"
@@ -31,6 +29,8 @@ TODO:
 #include "src/OTAfw.h"
 #include "src/EspNow.h"
 #include "src/Web.h"
+#include "src/WS.h"
+#include "src/Raw.h"
 #include "esp_task_wdt.h"
 
 void SetupWDT(){
@@ -56,7 +56,6 @@ void setup() {
   Debug::usbprintf("NRG Gateway Firmware | %s | %s - %s %s \n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
   SetupWDT();
   Led::begin();
-  // StatusLed::begin();
   Storage::begin();
   Config::load();                 // load NVS / defaults
   NetworkMgr::instance().setup(NetworkProfile::Ultra /* of WiFiOnly/EthOnly */);
@@ -70,7 +69,12 @@ void setup() {
 
 void QueueLoop(){
   //todo in worker
-  Web::rawPrint();
+  if ( !P1::newTelegram() ) return;
+  P1::clearNewTelegram();
+  // Ws::notifyRawTelegram(P1::RawTelegram);
+  Ws::broadcast("raw_telegram", [](JsonObject d){ d["text"] = P1::RawTelegram; });
+  Raw::broadcastLine(P1::RawTelegram + "\n");
+  P1::broadcastFields();
 }
 
 void loop() {
@@ -80,7 +84,6 @@ void loop() {
   Led::loop();
   QueueLoop();
   // OTAfw::loop();
-  // StatusLed::loop();
   Button::loop();
   NetworkMgr::instance().tick();
   esp_task_wdt_reset();

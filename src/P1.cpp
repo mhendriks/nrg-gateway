@@ -1,3 +1,4 @@
+#include "WS.h"
 #include "P1.h"
 #include "Debug.h"
 #include "Config.h"
@@ -279,6 +280,7 @@ namespace {
 namespace P1 {
 
   String RawTelegram;
+  JsonDocument s_fieldsDoc;
 
   bool isV5() { return (s_P1BaudRate == 115200) && s_checksumEnabled; }
 
@@ -398,4 +400,42 @@ float solarW() {
 }
 
   void onRaw(RawSink cb){ rawSink = cb; }
+
+
+  struct BuildJson {
+   template<typename Item>
+    void apply(Item &i) {
+     char Name[25];
+     strncpy(Name,String(Item::name).c_str(),sizeof(Name));
+
+      // if (!isInFieldsArray(Name)) return;
+        
+        if (i.present()) {          
+          // s_fieldsDoc[Name]["value"] = value_to_json(i.val());
+          s_fieldsDoc[Name] = value_to_json(i.val());
+          // if (String(Item::unit()).length() > 0) s_fieldsDoc[Name]["unit"]  = Item::unit();
+        }  //else if (!onlyIfPresent) s_fieldsDoc[Name]["value"] = "-";   
+  }
+  template<typename Item>
+  Item& value_to_json(Item& i) {
+    return i;
+  }
+
+  double value_to_json(TimestampedFixedValue i) {
+    return i.int_val()/1000.0;
+  }
+  
+  double value_to_json(FixedValue i) {
+    return i.int_val()/1000.0;
+  }
+
+  };
+
+  void broadcastFields(){
+    if ( !Ws::NrClients() ) return;
+    s_fieldsDoc.clear();
+    dsmrData.applyEach(BuildJson());
+    Ws::sendWs("fields", s_fieldsDoc);
+  }
+
 }

@@ -1,3 +1,10 @@
+/*
+
+TODO: 
+- doorlopen en checken
+- nieuwe statussen toevoegen (inlezen p1, blink bij wifi config etc)
+*/
+
 #pragma once
 #include <Arduino.h>
 #include "Config.h"

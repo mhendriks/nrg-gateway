@@ -1,3 +1,12 @@
+/*
+
+TODO: 
+- doorlopen en checken
+- detect hardware
+- config per hardware / versie opnemen
+
+*/
+
 #pragma once
 #include <Arduino.h>
 

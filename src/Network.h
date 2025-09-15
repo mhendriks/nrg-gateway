@@ -1,3 +1,12 @@
+/*
+
+TODO: 
+- doorlopen en checken
+- wifi manager checken op bestaande oplossing
+- Ethernet implementeren
+
+*/
+
 #pragma once
 #include <WiFi.h>
 #include <DNSServer.h>

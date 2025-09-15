@@ -1,6 +1,17 @@
+/*
+
+TODO: 
+- eigen reader of toch de proven dsmr reader gebruiken -> proven
+- detect once 
+- post processing na lezing 
+
+*/
+
 #pragma once
 #include <Arduino.h>
 #include "esp_task_wdt.h"
+#include <ArduinoJson.h>
+
 
 namespace P1 {
   using RawSink = void (*)(const char*, size_t);
@@ -33,4 +44,5 @@ namespace P1 {
   // Hooks
   void onRaw(RawSink cb);
   void setVirtual(bool en);
+  void broadcastFields();
 }

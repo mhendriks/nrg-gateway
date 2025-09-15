@@ -1,3 +1,9 @@
+/*
+
+TODO: 
+- implementeren PostTelegram als optie
+
+*/
 #pragma once
 #include <Arduino.h>
 

@@ -16,7 +16,6 @@ namespace Debug {
   inline void print(const __FlashStringHelper* s) { Serial.print(s); }
   inline void println(const __FlashStringHelper* s) { Serial.println(s); }
 
-  // (optioneel) handige printf wrapper
   inline void printf(const char* fmt, ...) {
     va_list ap; va_start(ap, fmt); Serial.vprintf(fmt, ap); va_end(ap);
   }

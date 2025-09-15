@@ -1,3 +1,11 @@
+/*
+
+TODO: 
+- doorlopen en checken
+- specifieke zaken opslaan (startup, errors .... )
+
+*/
+
 #pragma once
 #include <Arduino.h>
 

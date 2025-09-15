@@ -1,3 +1,10 @@
+/*
+
+TODO: 
+- nog implementeren
+
+*/
+
 #pragma once
 #include <Arduino.h>
 
