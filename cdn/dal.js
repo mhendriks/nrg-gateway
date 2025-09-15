@@ -1,19 +1,21 @@
-// cdn/dal.js  — WebSocket-first DAL (HTTP vervangen door WS-RPC + streams)
-// ESM module
-// Gebruik: import { DAL } from './dal.js';  DAL.init();  DAL.ws.on('now', cb);  await DAL.getNow();
+/* cdn/dal.js — WebSocket-first DAL zonder ES modules (maakt window.DAL)
+   Features:
+   - WS met backoff + heartbeat
+   - Pub/Sub: DAL.ws.on/off + broadcasts per type
+   - RPC: DAL.rpc(method, params) => Promise
+   - Compat-calls: getNow/getRng/getConfig/setConfig/setConfigs/remoteUpdate/reboot/getStatus/doAction
+*/
 
-export const DAL = (function DALFactory(){
-  // =========================
-  // Event-bus (per "type")
-  // =========================
+(function(global){
+  'use strict';
+
+  // ===== Event-bus =====
   const listeners = new Map(); // type -> Set<fn>
   function on(type, fn){ if(!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); }
   function off(type, fn){ const set = listeners.get(type); if(set){ set.delete(fn); if(!set.size) listeners.delete(type); } }
-  function emit(type, payload){ const set = listeners.get(type); if(set){ for(const fn of set) { try{ fn(payload);}catch(e){ console.error('[DAL] handler error', e);} } } }
+  function emit(type, payload){ const set = listeners.get(type); if(set){ set.forEach(fn=>{ try{ fn(payload); }catch(e){ console.error('[DAL] handler error', e); } }); } }
 
-  // =========================
-  // WebSocket state
-  // =========================
+  // ===== WebSocket state =====
   let ws = null;
   let wantOpen = false;
   let reconnectAttempts = 0;
@@ -31,7 +33,7 @@ export const DAL = (function DALFactory(){
   function startHeartbeat(){
     stopHeartbeat();
     lastPong = Date.now();
-    // ping elke 20s, failover als >40s geen pong
+    // ping elke 20s; als >40s geen pong -> reconnect
     pingTimer = setInterval(()=> { trySend({type:'ping', data:{ts: Date.now()}}); }, 20000);
     watchdogTimer = setInterval(()=>{
       if (Date.now() - lastPong > 40000){
@@ -61,7 +63,7 @@ export const DAL = (function DALFactory(){
   function safeClose(reconnect=false){
     stopHeartbeat();
     if (ws){
-      try { ws.close(); } catch(_) {}
+      try { ws.close(); } catch(_){}
       ws = null;
     }
     if (reconnect) scheduleReconnect();
@@ -74,7 +76,6 @@ export const DAL = (function DALFactory(){
 
     const { type, data, id } = msg || {};
 
-    // Heartbeat
     if (type === 'pong'){ lastPong = Date.now(); return; }
 
     // RPC result / error
@@ -83,7 +84,7 @@ export const DAL = (function DALFactory(){
       return;
     }
 
-    // Broadcast events ("now", "raw_telegram", "log", ...)
+    // Broadcast events (bijv. 'now', 'raw_telegram', 'log', ...)
     if (type) emit(type, data);
     emit('message', msg);
   }
@@ -129,9 +130,7 @@ export const DAL = (function DALFactory(){
     safeClose(false);
   }
 
-  // =========================
-  // RPC laag (vervanging HTTP)
-  // =========================
+  // ===== RPC laag =====
   let nextRpcId = 1;
   const pending = new Map(); // id -> {resolve, reject, tmr}
 
@@ -143,8 +142,9 @@ export const DAL = (function DALFactory(){
     ok ? slot.resolve(data) : slot.reject(data);
   }
 
-  function rpc(method, params = {}, { timeoutMs = 15000 } = {}){
+  function rpc(method, params = {}, opts){
     const id = nextRpcId++;
+    const timeoutMs = (opts && opts.timeoutMs) || 15000;
     return new Promise((resolve, reject)=>{
       const tmr = setTimeout(()=>{
         pending.delete(id);
@@ -155,95 +155,64 @@ export const DAL = (function DALFactory(){
     });
   }
 
-  // =========================
-  // Publieke API (compat)
-  // =========================
-
-  // Init: open WS. Je kunt een custom WS-pad meegeven.
-  function init({ url } = {}){
-    connect(url);
-    return new Promise((res)=> {
+  // ===== Publieke API (compat) =====
+  function init(options){
+    options = options || {};
+    connect(options.url);
+    // return een mini-waiter die resolve't bij open
+    return new Promise((res)=>{
       if (ws && ws.readyState === WebSocket.OPEN) return res();
       const onOpen = ()=>{ off('open', onOpen); res(); };
       on('open', onOpen);
     });
   }
 
-  // ---- Streams (server broadcast) ----
-  // Voorheen werd /now periodiek via HTTP gepolled. Nu stream:
+  // Streams (broadcasts)
   function subscribeNow(handler){ on('now', handler); return ()=>off('now', handler); }
   function subscribeRaw(handler){ on('raw_telegram', handler); return ()=>off('raw_telegram', handler); }
   function subscribeLog(handler){ on('log', handler); return ()=>off('log', handler); }
 
-  // ---- Vervangers voor oude HTTP endpoints (RPC) ----
-  // Namen hieronder zijn generiek; pas evt. server side mapping aan.
+  // “HTTP” → RPC vervangers
   function getNow(){ return rpc('get_now'); }
-  function getRng(kind, { from=null, to=null } = {}){ return rpc('get_rng', { kind, from, to }); } // kind: 'hours'|'days'|'months'
+  function getRng(kind, range){ range = range || {}; return rpc('get_rng', { kind, from: range.from ?? null, to: range.to ?? null }); }
   function getConfig(){ return rpc('get_config'); }
   function setConfig(key, value){ return rpc('set_config', { key, value }); }
-  function setConfigs(obj){ return rpc('set_configs', { entries: obj }); } // bulk
+  function setConfigs(obj){ return rpc('set_configs', { entries: obj }); }
   function remoteUpdate(version){ return rpc('remote_update', { version }); }
   function reboot(){ return rpc('reboot'); }
   function getStatus(){ return rpc('get_status'); }
-  function doAction(name, params={}){ return rpc('action', { name, ...params }); }
+  function doAction(name, params){ return rpc('action', Object.assign({ name }, params||{})); }
 
-  // ---- Directe WS-zending (bijv. subscribe/command) ----
+  // Directe WS send (niet-RPC)
   function wsSend(type, data){ trySend({ type, data }); }
 
-  const wsApi = {
-    connect, disconnect, on, off,
-    send: wsSend,
-    get isOpen(){ return !!ws && ws.readyState === WebSocket.OPEN; },
-    get url(){ return wsUrl; }
-  };
-
-  // =========================
-  // Export
-  // =========================
-  return {
+  const DAL = {
     // lifecycle
     init,
-    // websocket
-    ws: wsApi,
+    // ws
+    ws: {
+      connect, disconnect, on, off, send: wsSend,
+      get isOpen(){ return !!ws && ws.readyState === WebSocket.OPEN; },
+      get url(){ return wsUrl; }
+    },
     // streams
-    subscribeNow,
-    subscribeRaw,
-    subscribeLog,
+    subscribeNow, subscribeRaw, subscribeLog,
     // rpc
     rpc,
-    // compat "HTTP" -> RPC
-    getNow,
-    getRng,
-    getConfig,
-    setConfig,
-    setConfigs,
-    remoteUpdate,
-    reboot,
-    getStatus,
-    doAction,
+    // compat
+    getNow, getRng, getConfig, setConfig, setConfigs, remoteUpdate, reboot, getStatus, doAction,
   };
-})();
 
-/* ======= KORTE HOWTO =======
-1) Start in de app:
-   import { DAL } from './dal.js';
-   await DAL.init();                 // opent WS (ws(s)://host/ws)
+  // Zet in global scope
+  global.DAL = DAL;
 
-2) Streams:
-   const unsub = DAL.subscribeNow(updateUi);
-   // later: unsub();
+  // Auto-connect (uit te zetten via window.DAL_AUTO_CONNECT=false vóór deze script)
+  if (global.DAL_AUTO_CONNECT !== false){
+    // geen await—gewoon verbinden zodra mogelijk
+    try { connect(); } catch(e){ console.warn('[DAL] auto-connect failed', e); }
+  }
 
-3) Calls die eerst HTTP waren:
-   const now = await DAL.getNow();
-   const cfg = await DAL.getConfig();
-   await DAL.setConfig('price_tier', 'low');
-   const rng = await DAL.getRng('hours', {from: 1726200000, to: 1726286400});
+  // Optioneel: pauzeren bij tab verborgen (nu: niets doen, steady connection)
+  // document.addEventListener('visibilitychange', ()=>{ ... });
 
-4) Custom command:
-   DAL.ws.send('subscribe', { topic: 'now' });
-
-5) Server RPC-contract:
-   Client -> {type:'rpc', id, method:'get_now', params:{}}
-   Server -> {type:'rpc_result', id, data:{ ... }}  // of {type:'rpc_error', id, data:{message:'...'}}
-   Broadcasts blijven {type:'now'|'raw_telegram'|'log', data:{...}}
-================================ */
+})(window);

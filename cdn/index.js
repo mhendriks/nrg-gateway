@@ -6,6 +6,7 @@
 ***************************************************************************      
 */
 
+const APIGW = "";
 const SQUARE_M_CUBED 	   = "\u33A5";
 
 "use strict";
@@ -431,22 +432,25 @@ function applyShowCols(condition, tablesAndCols) {
   
 function SetOnSettings(json) {
 	// Initiele detectie: water, gas, teruglevering
+	console.log("SetOnSettings = ", json);
 	if (!HeeftGas && !IgnoreGas)
-		HeeftGas = "gas_delivered" in json ? !isNaN(json.gas_delivered.value) : false;
+		HeeftGas = "gas_delivered" in json ? !isNaN(json.gas_delivered) : false;
 	if (!HeeftWater)
-		HeeftWater = "water" in json ? !isNaN(json.water.value) : false;
+		HeeftWater = "water" in json ? !isNaN(json.water) : false;
 
 	if (!Injection) {
-		Injection = !isNaN(json.energy_returned_tariff1?.value) ? json.energy_returned_tariff1.value : false;
-		if (!Injection) Injection = !isNaN(json.energy_returned_tariff2?.value) ? json.energy_returned_tariff2.value : false;
+		Injection = !isNaN(json.energy_returned_tariff1) ? json.energy_returned_tariff1 : false;
+		if (!Injection) Injection = !isNaN(json.energy_returned_tariff2) ? json.energy_returned_tariff2 : false;
 	}
 	Injection = Injection && !IgnoreInjection;
 
 	// Fasebepaling voor slimme meter
 	if (Dongle_Config !== "p1-q") {
 		Phases = 1;
-		if (!isNaN(json.current_l2?.value)) Phases++;
-		if (!isNaN(json.current_l3?.value)) Phases++;
+		Phases += "current_l2" in json? 1 : 0;
+		Phases += "current_l3" in json? 1 : 0;
+// 		if (!isNaN(json.current_l2)) Phases++;
+// 		if (!isNaN(json.current_l3)) Phases++;
 	}
 
 	// Verberg historische weergave indien uitgeschakeld
@@ -701,17 +705,17 @@ function refreshDashboard(json){
 	//check new day = refresh
 	let DayEpochTemp = Math.floor(new Date().getTime() / 86400000.0);
 	if (DayEpoch != DayEpochTemp || hist_arrP.length < 4 ) {
-		if ( EnableHist ) refreshHistData("Days"); //load data first visit
+// 		if ( EnableHist ) refreshHistData("Days"); //load data first visit
 		DayEpoch = DayEpochTemp;
 	}
 
 		//-------CHECKS
 
 		SetOnSettings(json);
-		if (json.timestamp.value == "-") {
-			console.log("timestamp missing : p1 data incorrect!");
-			return;
-		}
+// 		if ( "timestamp" in json ? false : true) {
+// 			console.log("timestamp missing : p1 data incorrect!");
+// 			return;
+// 		}
 		
 		//-------TOON METERS
 		document.getElementById("w8api").style.display = "none"; //hide wait message
@@ -726,52 +730,59 @@ function refreshDashboard(json){
 			document.getElementById("l7").style.display = "block";
 			document.getElementById("l2").style.display = "none";
 		}
-		if ( json.peak_pwr_last_q.value != "-" ) document.getElementById("dash_peak").style.display = "block";
+		if ( "peak_pwr_last_q" in json ) document.getElementById("dash_peak").style.display = "block";
 
 		//------- EID Planner
 		if ( eid_planner_enabled ) objDAL.refreshEIDPlanner();
 		
 		//-------Kwartierpiek
-		document.getElementById("peak_month").innerHTML = formatValue(json.highest_peak_pwr.value);
-		document.getElementById("dash_peak_delta").innerText = formatValue(json.highest_peak_pwr.value - json.peak_pwr_last_q.value);
-		trend_peak.data.datasets[0].data=[json.peak_pwr_last_q.value, json.highest_peak_pwr.value-json.peak_pwr_last_q.value];	
-		trend_peak.update();
-		if (json.peak_pwr_last_q.value > 0.75 * json.highest_peak_pwr.value ) trend_peak.data.datasets[0].backgroundColor = ["#dd0000", "rgba(0,0,0,0.1)"];
-		else trend_peak.data.datasets[0].backgroundColor = ["#009900", "rgba(0,0,0,0.1)"];
+		if ("highest_peak_pwr" in json) {
+			document.getElementById("peak_month").innerHTML = formatValue(json.highest_peak_pwr);
+			if ("peak_pwr_last_q" in json) {
+				document.getElementById("dash_peak_delta").innerText = formatValue(json.highest_peak_pwr - json.peak_pwr_last_q);
+				trend_peak.data.datasets[0].data=[json.peak_pwr_last_q.value, json.highest_peak_pwr-json.peak_pwr_last_q];	
+				trend_peak.update();
+				if (json.peak_pwr_last_q.value > 0.75 * json.highest_peak_pwr ) trend_peak.data.datasets[0].backgroundColor = ["#dd0000", "rgba(0,0,0,0.1)"];
+				else trend_peak.data.datasets[0].backgroundColor = ["#009900", "rgba(0,0,0,0.1)"];
+			}
+		}
 		
 		//-------VOLTAGE
 		let v1 = 0, v2 = 0, v3 = 0;
-		if (!isNaN(json.voltage_l1.value)) v1 = json.voltage_l1.value; 
-		if (!isNaN(json.voltage_l2.value)) v2 = json.voltage_l2.value;
-		if (!isNaN(json.voltage_l3.value)) v3 = json.voltage_l3.value;
+// 		if (!isNaN(json.voltage_l1)) 
+		v1 = ("voltage_l1" in json ? json.voltage_l1 : 0); 
+// 		if (!isNaN(json.voltage_l2)) 
+		v2 = "voltage_l2" in json ? json.voltage_l2 : 0;
+// 		if (!isNaN(json.voltage_l3)) 
+		v3 = "voltage_l3" in json ? json.voltage_l3 : 0;
 
 
 		if ( ShowVoltage && v1 ) {
 			document.getElementById("l2").style.display = "block"
 			document.getElementById("fases").innerHTML = Phases;
 			
-      let Vmin_now = v1;
-      let Vmax_now = v1;
-      if( Phases != 1){
-			  Vmin_now = math.min(v1, v2, v3);
-			  Vmax_now = math.max(v1, v2, v3);
-      }
-			
-			//min - max waarde
-			if (minV == 0.0 || Vmin_now < minV) { minV = Vmin_now; }
-			if (Vmax_now > maxV) { maxV = Vmax_now; }
+      // let Vmin_now = v1;
+//       let Vmax_now = v1;
+//       if( Phases != 1){
+// 			  Vmin_now = math.min(v1, v2, v3);
+// 			  Vmax_now = math.max(v1, v2, v3);
+//       }
+// 			
+// 			//min - max waarde
+// 			if (minV == 0.0 || Vmin_now < minV) { minV = Vmin_now; }
+// 			if (Vmax_now > maxV) { maxV = Vmax_now; }
 // 			document.getElementById(`power_delivered_2max`).innerHTML = Number(maxV.toFixed(1)).toLocaleString("nl", {minimumFractionDigits: 1, maximumFractionDigits: 1} );
 // 			document.getElementById(`power_delivered_2min`).innerHTML = Number(minV.toFixed(1)).toLocaleString("nl", {minimumFractionDigits: 1, maximumFractionDigits: 1} );
 
 			//update gauge
-			gaugeV.data.datasets[0].data=[v1-207,253-json.voltage_l1.value];
-			if (v2) gaugeV.data.datasets[1].data=[v2-207,253-json.voltage_l2.value];
-			if (v3) gaugeV.data.datasets[2].data=[v3-207,253-json.voltage_l3.value];
+			gaugeV.data.datasets[0].data=[v1-207,253-v1];
+			if (v2) gaugeV.data.datasets[1].data=[v2-207,253-v2];
+			if (v3) gaugeV.data.datasets[2].data=[v3-207,253-v3];
 			gaugeV.update();
 		}
 		//-------ACTUAL
 		//afname of teruglevering bepalen en signaleren
-		let TotalKW	= json.power_delivered.value - json.power_returned.value;
+		let TotalKW	= json.power_delivered - json.power_returned;
 
 		if ( TotalKW <= 0 ) { 
 // 			TotalKW = -1.0 * json.power_returned.value;
@@ -788,23 +799,23 @@ function refreshDashboard(json){
 		}
 		
 		//update gauge
-		if ( !isNaN(json.current_l1.value ) ) {
-		TotalAmps = (isNaN(json.current_l1.value)?0:json.current_l1.value) + 
-			(isNaN(json.current_l2.value)?0:json.current_l2.value) + 
-			(isNaN(json.current_l3.value)?0:json.current_l3.value);
+		if ( "current_l1" in json ) {
+		TotalAmps = json.current_l1 + 
+			(("current_l2" in json)?json.current_l2:0) + 
+			(("current_l3" in json)?json.current_l3:0);
 
-		gauge3f.data.datasets[0].data=[json.current_l1.value,AMPS-json.current_l1.value];
-		if (Phases == 2) {
-			gauge3f.data.datasets[1].data=[json.current_l2.value,AMPS-json.current_l2.value];
+		gauge3f.data.datasets[0].data=[json.current_l1,AMPS-json.current_l1];
+		if (Phases == 2 || Phases == 3) {
+			gauge3f.data.datasets[1].data=[json.current_l2,AMPS-json.current_l2];
 			document.getElementById("f2").style.display = "inline-block";
 			document.getElementById("v2").style.display = "inline-block";
 			}
 		if (Phases == 3) {
-			gauge3f.data.datasets[1].data=[json.current_l2.value,AMPS-json.current_l2.value];
-			document.getElementById("f2").style.display = "inline-block";
-			document.getElementById("v2").style.display = "inline-block";
+			// gauge3f.data.datasets[1].data=[json.current_l2,AMPS-json.current_l2];
+// 			document.getElementById("f2").style.display = "inline-block";
+// 			document.getElementById("v2").style.display = "inline-block";
 			
-			gauge3f.data.datasets[2].data=[json.current_l3.value,AMPS-json.current_l3.value];
+			gauge3f.data.datasets[2].data=[json.current_l3,AMPS-json.current_l3];
 			document.getElementById("f3").style.display = "inline-block";
 			document.getElementById("v3").style.display = "inline-block";
 			}
@@ -812,7 +823,7 @@ function refreshDashboard(json){
 			// current is missing = calc current based on actual power		
 			TotalAmps = Number(Math.abs(TotalKW)*1000/230).toFixed(0);
 			gauge3f.data.datasets[0].data=[TotalAmps,AMPS-TotalAmps];
-		};	
+		};	//"current_l1" in json
 		
 		gauge3f.options.title.text = Number(TotalAmps).toFixed(2) + " A";
 		gauge3f.update();
@@ -839,8 +850,8 @@ function refreshDashboard(json){
 		if (Dongle_Config != "p1-q") {
 
       //bereken verschillen afname, teruglevering en totaal
-      let nPA = isNaN(json.energy_delivered_tariff1.value)? 0:json.energy_delivered_tariff1.value + isNaN(json.energy_delivered_tariff2.value)?0:json.energy_delivered_tariff2.value;
-      let nPI = isNaN(json.energy_returned_tariff1.value) ? 0:json.energy_returned_tariff1.value  + isNaN(json.energy_returned_tariff2.value) ?0:json.energy_returned_tariff2.value;
+      let nPA = isNaN(json.energy_delivered_tariff1) ? 0:json.energy_delivered_tariff1 + isNaN(json.energy_delivered_tariff2)?0:json.energy_delivered_tariff2;
+      let nPI = isNaN(json.energy_returned_tariff1) ? 0:json.energy_returned_tariff1  + isNaN(json.energy_returned_tariff2) ?0:json.energy_returned_tariff2;
       Parra = calculateDifferences( nPA, hist_arrPa, 1);
       Parri = calculateDifferences( nPI, hist_arrPi, 1);
       for(let i=0;i<3;i++){ Parr[i]=Parra[i] - Parri[i]; }
@@ -867,7 +878,7 @@ function refreshDashboard(json){
     //-------GAS	
 		if ( HeeftGas && (Dongle_Config != "p1-q") ) 
 		{
-      Garr = calculateDifferences(json.gas_delivered.value, hist_arrG, 1);
+      Garr = calculateDifferences(json.gas_delivered, hist_arrG, 1);
       updateGaugeTrend(trend_g, Garr);
 			document.getElementById("G").innerHTML = formatValue(Garr[0]);
 		}
@@ -875,7 +886,7 @@ function refreshDashboard(json){
 		//-------WATER	
 		if (HeeftWater) 
 		{
-      Warr = calculateDifferences(json.water.value, hist_arrW, 1000);
+      Warr = calculateDifferences(json.water, hist_arrW, 1000);
       updateGaugeTrend(trend_w, Warr);
 			document.getElementById("W").innerHTML = Number(Warr[0]).toLocaleString();
 		}
@@ -883,7 +894,7 @@ function refreshDashboard(json){
 		//-------HEAT
 		if (Dongle_Config == "p1-q") 
 		{
-      Garr = calculateDifferences(json.gas_delivered.value, hist_arrG, 1000);
+      Garr = calculateDifferences(json.gas_delivered, hist_arrG, 1000);
       updateGaugeTrend(trend_q, Garr);
 			document.getElementById("Q").innerHTML = Number(Garr[0]).toLocaleString("nl", {minimumFractionDigits: 0, maximumFractionDigits: 0} );
 		}
@@ -948,9 +959,39 @@ function RedirectBtn(){
 setTimeout(mijnFunctie, 2000);
 }
 
+
+function DalHandleMsg(msg){
+    // msg = { type, ver, ts, seq, data }
+    console.debug('[WS] message:', msg.type, msg);
+//     console.debug('[WS] message - time: ', msg.ts);
+   	//update time
+    refreshTime(msg.ts);
+
+	//update token
+    update_reconnected=true;
+	
+	switch (msg.type) {
+		case "raw_telegram":   document.getElementById("TelData").textContent = msg.data.text; break;
+// 		case "fields": SetOnSettings(msg.data); if (activeTab=="bDashTab") refreshDashboard(msg.data);else parseSmFields(msg.data); break;
+		case "fields": SetOnSettings(msg.data); if (activeTab=="bDashTab") refreshDashboard(msg.data);else parseSmFields(msg.data); break;		
+		case "devinfo": parseDeviceInfo(msg.data.text); break;
+		case "dev_settings": ParseDevSettings(); refreshSettings();break;
+		case "solar": UpdateSolar();break;
+		case "accu": UpdateAccu();break;
+		case "insights": InsightData(msg.data.text);break;
+		case "eid_claim":ProcessEIDClaim(msg.data.text); break;
+		case "eid_planner":ProcessEIDPlanner(msg.data.text); break;
+		case "netswitch": refreshNetSwitch(msg.data.text);break;
+		case "versionmanifest": parseVersionManifest(msg.data.text); break;
+		case "days": expandData(msg.data.text);refreshHistData("Days");break;
+		case "hours": expandData(msg.data.text);refreshHistData("Hours");break;
+		case "months": expandData(msg.data.text);refreshHistData("Months");break;
+	 	default: console.error("missing handler; type="+msg.type);
+	}
+}
+
 //main entry point from DSMRindex.html or window.onload
-function bootsTrapMain() 
-{
+function bootsTrapMain() {
   console.log("bootsTrapMain()");
 //   loadIcons();
 
@@ -966,7 +1007,24 @@ function bootsTrapMain()
 	FrontendConfig();
 	
 	//init DAL
-	initDAL(updateFromDAL);
+// 	initDAL(updateFromDAL);
+	// DAL.init();
+  // 2) Log lifecycle
+  DAL.ws.on('open',  () => console.log('[WS] open', DAL.ws.url));
+  DAL.ws.on('close', () => console.log('[WS] close'));
+  DAL.ws.on('error', (e) => console.warn('[WS] error', e));
+
+  // 3) Log ALLE berichten (wildcard)
+  
+  DAL.ws.on('message', (msg) => {
+    DalHandleMsg(msg);
+  });
+
+  // 4) Specifiek type
+//   DAL.ws.on('raw_telegram', (data) => {
+// //     console.log('[WS] raw_telegram:', data);
+//     document.getElementById("TelData").textContent = data.text;
+//   });
 
     setMonthTableType();
     openTab();
@@ -1238,81 +1296,83 @@ function SendNetSwitchJson() {
   
 
 //============================================================================  
-  function FSExplorer() {
-	 let main = document.querySelector('main');
-	 let fileSize = document.querySelector('fileSize');
+ function FSExplorer() {
+  const main = document.querySelector('main');
+  const fileSize = document.querySelector('#fileSize'); // fix: was 'fileSize'
 
-	 Spinner(true);
-	 fetch('api/listfiles', {"setTimeout": 5000}).then(function (response) {
-		 return response.json();
-	 }).then(function (json) {
-	
-	//clear previous content	 
-	 let list = document.getElementById("FSmain");
-	 while (list.hasChildNodes()) {  
-	   list.removeChild(list.firstChild);
-	 }
-    	
-	 nFilecount = json.files.length;
-     let dir = '<table id="FSTable" width=90%>';
-	   for (var i = 0; i < json.files.length; i++) {
-		 dir += "<tr>";
-		 dir += `<td width=250px nowrap><a href ="${json.files[i].name}" target="_blank">${json.files[i].name}</a></td>`;
-		 dir += `<td width=100px nowrap><small>${json.files[i].size}</small></td>`;
-		 dir += `<td width=100px nowrap><a href ="${json.files[i].name}"download="${json.files[i].name}"> Download </a></td>`;
-		 dir += `<td width=100px nowrap><a href ="${json.files[i].name}?delete=/${json.files[i].name}"> Delete </a></td>`;
-		 dir += "</tr>";
-	   }	// for ..
-	   main.insertAdjacentHTML('beforeend', dir);
-	   document.querySelectorAll('[href*=delete]').forEach((node) => {
-			 node.addEventListener('click', () => {
-					 if (!confirm('Delete, sure ?!')) event.preventDefault();  
-			 });
-	   });
-	   main.insertAdjacentHTML('beforeend', '</table>');
-//        main.insertAdjacentHTML('beforeend', `<div id='filecount'>Aantal bestanden: ${nFilecount} </div>`);
-       main.insertAdjacentHTML('beforeend', `<div id='filecount'>${t('lbl-fm-files')}: ${nFilecount} </div>`);       
-	   main.insertAdjacentHTML('beforeend', `<p id="FSFree">${t('lbl-fm-storage')}: <b>${json.fs.usedBytes} ${t('lbl-fm-used')}</b> | ${json.fs.totalBytes} ${t('lbl-fm-total')}`);
-	   free = json.fs.freeBytes;
-	   fileSize.innerHTML = "<b> &nbsp; </b><p>";    // spacer                
-	   Spinner(false);
-	 });	// function(json)
-	 
-    //view selected filesize
-	  document.getElementById('Ifile').addEventListener('change', () => {
-      //format filesize
-		  let nBytes = document.getElementById('Ifile').files[0].size;
-      let output = `${nBytes} Byte`;
-		  for (let aMultiples = [
-			 ' KB',
-			 ' MB'
-			], i = 0, nApprox = nBytes / 1024; nApprox > 1; nApprox /= 1024, i++) {
-			  output = nApprox.toFixed(2) + aMultiples[i];
-			}
+  const fmtBKB = (bytes) => (bytes < 1024 ? `${bytes} B` : `${(bytes/1024).toFixed(1)} KB`);
 
-      let fUpload = true;
-      //check freespace
-			if (nBytes > free) {
-			  fileSize.innerHTML = `<p><small> File size: ${output}</small><strong style="color: red;"> not enough space! </strong><p>`;
-        fUpload = false;
-			}
-      //check filecount
-      //TODO: 
-      //  Although uploading a new file is blocked, REPLACING a file when the count is 30 must still be possible.
-      //  check if filename is already on the list, if so, allow this upload.
-			if ( nFilecount >= MAX_FILECOUNT) {
-			  fileSize.innerHTML = `<p><small> file size: ${output}</small><strong style="color: red;"> Max number of files (${MAX_FILECOUNT}) reached! </strong><p>`;
-        fUpload = false;
-			}
-      if( fUpload ){
-        fileSize.innerHTML = `<b>File size:</b> ${output}<p>`;
-			  document.getElementById('Iupload').removeAttribute('disabled');
-      }
-			else {			  
-        document.getElementById('Iupload').setAttribute('disabled', 'disabled');
-			}
-	 });	
-  }
+  Spinner(true);
+  fetch('api/listfiles', { setTimeout: 5000 })
+    .then(r => r.json())
+    .then(json => {
+      // clear previous content
+      const list = document.getElementById('FSmain');
+      while (list.firstChild) list.removeChild(list.firstChild);
+
+      let nFilecount = json.files.length;
+      let dir = '<table id="FSTable" width="90%">';
+      json.files.forEach((f) => {
+        dir += "<tr>";
+        dir += `<td width="250" nowrap><a href="${f.name}" target="_blank">${f.name}</a></td>`;
+        dir += `<td width="120" nowrap><small>${fmtBKB(Number(f.size)||0)}</small></td>`;
+        dir += `<td width="120" nowrap><a href="${f.name}" download="${f.name}">Download</a></td>`;
+        dir += `<td width="120" nowrap><a href="${f.name}?delete=/${encodeURIComponent(f.name)}">Delete</a></td>`;
+        dir += "</tr>";
+      })
+      main.insertAdjacentHTML('beforeend', dir);
+      document.querySelectorAll('[href*=delete]').forEach((node) => {
+        node.addEventListener('click', (event) => {
+          if (!confirm('Delete, sure ?!')) event.preventDefault();
+        });
+      });
+      main.insertAdjacentHTML('beforeend', '</table>');
+
+      // teller + opslag (nu ook B/KB)
+      main.insertAdjacentHTML('beforeend', `<div id="filecount">${t('lbl-fm-files')}: ${nFilecount}</div>`);
+      const used = Number(json.fs?.usedBytes) || 0;
+      const total = Number(json.fs?.totalBytes) || 0;
+      const free = Number(json.fs?.freeBytes) || 0;
+      main.insertAdjacentHTML(
+        'beforeend',
+        `<p id="FSFree">${t('lbl-fm-storage')}: <b>${fmtBKB(used)} ${t('lbl-fm-used')}</b> | ${fmtBKB(total)} ${t('lbl-fm-total')}`
+      );
+
+      // spacer
+      if (fileSize) fileSize.innerHTML = "<b>&nbsp;</b><p>";
+      Spinner(false);
+
+      // upload check (minimale aanpassing: toont B/KB en gebruikt free)
+      document.getElementById('Ifile')?.addEventListener('change', () => {
+        const f = document.getElementById('Ifile').files?.[0];
+        if (!f) return;
+        const nBytes = f.size;
+        const output = fmtBKB(nBytes);
+
+        let fUpload = true;
+        if (nBytes > free) {
+          fileSize.innerHTML = `<p><small>${t('lbl-fm-file-size')||'File size'}: ${output}</small><strong style="color:red;"> ${t('lbl-fm-not-enough-space')||'not enough space!'}</strong><p>`;
+          fUpload = false;
+        }
+        if (nFilecount >= (window.MAX_FILECOUNT ?? 30)) {
+          const exists = json.files.some(x => x.name === f.name);
+          if (!exists) {
+            fileSize.innerHTML = `<p><small>${t('lbl-fm-file-size')||'File size'}: ${output}</small><strong style="color:red;"> ${t('lbl-fm-max-files-reached')||'Max number of files reached!'}</strong><p>`;
+            fUpload = false;
+          }
+        }
+        if (fUpload) {
+          fileSize.innerHTML = `<b>${t('lbl-fm-file-size')||'File size'}:</b> ${output}<p>`;
+          document.getElementById('Iupload')?.removeAttribute('disabled');
+        } else {
+          document.getElementById('Iupload')?.setAttribute('disabled','disabled');
+        }
+      });
+    })
+    .catch(e => alert(`FS list failed: ${e.message}`))
+    .finally(() => Spinner(false));
+}
+
 
 function parseDeviceInfo(obj) {
   const tableRef = document.getElementById('tb_info');
@@ -1489,10 +1549,26 @@ function checkESPOnline() {
   }
 
   //============================================================================  
-  function refreshTime( json ) {
+  function formatEpoch(epoch, utc = false) {
+  // epoch in seconden of milliseconden beide ok
+  const d = new Date(epoch < 1e12 ? epoch * 1000 : epoch);
+  const g = utc ? 'UTC' : '';
+  const pad = n => String(n).padStart(2, '0');
+
+  const DD = pad(d[`get${g}Date`]());
+  const MM = pad(d[`get${g}Month`]() + 1);
+  const YYYY = d[`get${g}FullYear`]();
+  const hh = pad(d[`get${g}Hours`]());
+  const mm = pad(d[`get${g}Minutes`]());
+  const ss = pad(d[`get${g}Seconds`]());
+
+  return `${DD}-${MM}-${YYYY} ${hh}:${mm}:${ss}`;
+}
+  //============================================================================  
+  function refreshTime( ts ) {
   
 	document.getElementById('theTime').classList.remove("afterglow");
-	document.getElementById('theTime').innerHTML = json.time;//formatTimestamp(json.timestamp.value );
+	document.getElementById('theTime').innerHTML = formatEpoch(ts);//formatTimestamp( ts );
 // 	console.log("time parsed .., data is ["+ JSON.stringify(json)+"]");
 	//after reboot checks of the server is up and running and redirects to home
 	if ((document.querySelector('#counter').textContent < 40) && (document.querySelector('#counter').textContent > 0)) window.location.replace("/");
