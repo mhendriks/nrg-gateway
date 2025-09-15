@@ -40,13 +40,18 @@ namespace {
   bool     s_pre40           = false;   // v2/v3 family (9600/7E1) if true
   uint32_t s_P1BaudRate      = 115200;  // 9600 or 115200
   bool     s_checksumEnabled = true;    // passed into parser (v5=true, v2=false)
-  uint32_t p1Success         = 0;
+  // uint32_t p1Success         = 0;
   uint32_t p1Error           = 0;
+  uint32_t p1Parsed          = 0;
 
   // timing/heartbeat
   uint32_t _lastMs   = 0;
   uint32_t _interval = 0;
   bool     gotFrame  = false;
+
+  uint8_t      WaterEquipped = 0;
+  uint8_t      GasEquipped = 0;
+  bool         isV5meter = true;
 
   // raw buffer (single-buffer strategy)
   static constexpr size_t BUF_MAX = 2048;
@@ -106,23 +111,105 @@ namespace {
   //   portEXIT_CRITICAL(&mux);
   // }
 
+byte MbusTypeAvailable(byte type){
+
+  // return first type which is available
+  if      ( dsmrData.mbus4_device_type == type ) return 4;
+  else if ( dsmrData.mbus3_device_type == type ) return 3;
+  else if ( dsmrData.mbus2_device_type == type ) return 2;
+  else if ( dsmrData.mbus1_device_type == type ) return 1;
+  return 0;
+}
+
+void ProcessOnce(){
+  Debug::println(F("first time check"));
+  // if (dsmrData.identification_present) {
+  //   //--- this is a hack! The identification can have a backslash in it
+  //   //--- that will ruin javascript processing :-(
+  //   for(int i=0; i<dsmrData.identification.length(); i++)
+  //   {
+  //     if (dsmrData.identification[i] == '\\') dsmrData.identification[i] = '=';
+  //   }
+  //   smID = dsmrData.identification;
+  // } // check id 
+
+  // if ( dsmrData.energy_delivered_total_present && !dsmrData.energy_delivered_tariff1_present ) bUseEtotals = true;
+  // if ( ! dsmrData.energy_delivered_tariff1_present && !dsmrData.energy_delivered_total_present ) bWarmteLink = true;
+  WaterEquipped = MbusTypeAvailable(7);
+  GasEquipped = MbusTypeAvailable(3);
+  Debug::printf("mbusWater: %d\r\n", WaterEquipped);
+  Debug::printf("mbusGas  : %d\r\n", GasEquipped);
+  // ResetStats();
+  isV5meter = dsmrData.voltage_l1_present || dsmrData.voltage_l2_present || dsmrData.voltage_l3_present;
+
+}
+
+void PreProcess(){
+  //copy BE id in general ID
+  if (dsmrData.p1_version_be_present) {
+    dsmrData.p1_version = dsmrData.p1_version_be;
+    dsmrData.p1_version_present     = true;
+    // dsmrData.p1_version_be_present  = false;
+  }
+  if ( !dsmrData.energy_delivered_total_present ) { dsmrData.energy_delivered_total._value = dsmrData.energy_delivered_tariff1.int_val() + dsmrData.energy_delivered_tariff2.int_val(); dsmrData.energy_delivered_total_present = true; }
+  if ( !dsmrData.energy_returned_total_present  ) { dsmrData.energy_returned_total._value = dsmrData.energy_returned_tariff1.int_val() + dsmrData.energy_returned_tariff2.int_val(); dsmrData.energy_returned_total_present = true; }
+  if ( !dsmrData.energy_delivered_tariff1_present && dsmrData.energy_delivered_total_present ) { dsmrData.energy_delivered_tariff1 = dsmrData.energy_delivered_total; dsmrData.energy_delivered_tariff1_present = true; }
+  if ( !dsmrData.energy_delivered_tariff1_present && dsmrData.energy_returned_total_present ) { dsmrData.energy_returned_tariff1 = dsmrData.energy_returned_total;dsmrData.energy_returned_tariff1_present = true; }
+  
+  // if (!dsmrData.timestamp_present) {
+  //       struct tm tm;
+  //       if ( getLocalTime(&tm) ) {
+  //         // DSTactive = tm.tm_isdst;
+  //         char dt[14];
+  //         sprintf(dt, "%02d%02d%02d%02d%02d%02d%s\0\0", (tm.tm_year -100 ), tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tm.tm_isdst?"S":"W");
+  //         dsmrData.timestamp         = dt;
+  //         dsmrData.timestamp_present = true;
+  //       }       
+  // } //!timestamp present
+
+  //cal current more accurate; only works with SMR 5 meters because voltage is only available in V5 meters
+  if ( dsmrData.voltage_l1_present && dsmrData.voltage_l1 ){
+    dsmrData.current_l1._value = (uint32_t)((dsmrData.power_delivered_l1.int_val() + dsmrData.power_returned_l1.int_val())/dsmrData.voltage_l1*1000);
+    dsmrData.current_l1_present = true;
+  }
+  if ( dsmrData.voltage_l2_present && dsmrData.voltage_l2 ){
+    dsmrData.current_l2._value = (uint32_t)((dsmrData.power_delivered_l2.int_val() + dsmrData.power_returned_l2.int_val())/dsmrData.voltage_l2*1000);
+    dsmrData.current_l2_present = true;
+  }
+  if ( dsmrData.voltage_l3_present && dsmrData.voltage_l3 ){
+    dsmrData.current_l3._value = (uint32_t)((dsmrData.power_delivered_l3.int_val() + dsmrData.power_returned_l3.int_val())/dsmrData.voltage_l3*1000);
+    dsmrData.current_l3_present = true;
+  }
+
+  // //-- handle mbus delivered values
+  // if (mbusWater) {
+  //   waterDelivered = MbusDelivered(mbusWater);
+  //   waterDeliveredTimestamp = mbusDeliveredTimestamp;
+  // }
+  // if (mbusGas) {
+  //   gasDelivered = MbusDelivered(mbusGas);
+  //   gasDeliveredTimestamp = mbusDeliveredTimestamp;
+  // }
+}
+
   // Parse a complete telegram; use a local MyData to avoid stale String state
   static bool parseDSMR(const char* telegram, size_t len) {
-    Debug::printf("P1 parser success: %u error: %u len: %u\n", (unsigned)p1Success, (unsigned)p1Error, (unsigned)len);
-
+    Debug::printf("P1 parsed: %u error: %u len: %u\n", (unsigned)++p1Parsed, (unsigned)p1Error, (unsigned)len);
+    
     MyData dsmr_new = {};
-    ParseResult<void> res = P1Parser::parse(&dsmr_new, telegram, len,
-                                                        /*unknown_error*/false, /*checksum*/s_checksumEnabled);
+    ParseResult<void> res = P1Parser::parse(&dsmr_new, telegram, len, /*unknown_error*/false, /*checksum*/s_checksumEnabled);
+    
     if (res.err) {
       p1Error++;
       Debug::println(res.fullError(telegram, telegram + len).c_str());
       return false;
     }
-    p1Success++;
+    
     dsmrData = dsmr_new;
-
-    auto keep = [](bool present, float v, float prev){ return present ? v : prev; };
-
+    if ( (p1Parsed - p1Error) == 1) ProcessOnce();
+    PreProcess();
+    
+    // auto keep = [](bool present, float v, float prev){ return present ? v : prev; };
     // float pwrW = s_power;
     // if (dsmr.power_delivered_present)  pwrW = dsmr.power_delivered.val() * 1000.0f;
     // // If you want net power, subtract returned:
@@ -319,14 +406,13 @@ namespace P1 {
   uint32_t lastTelegramMs(){ return _lastMs; }
   uint32_t intervalMs(){ return _interval ? _interval : (isV5()?1000:10000); }
 
-  // float powerW(){ float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return p; }
-  // float t1kWh(){ float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return t1; }
-  // float t2kWh(){ float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return t2; }
-  // float t1rKWh(){float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return t1r;}
-  // float t2rKWh(){float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return t2r;}
-  // float gasM3(){ float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return g; }
-  // float waterL(){float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return w; }
-  // float solarW(){float p,t1,t2,t1r,t2r,g,w,s; snapshotGet(p,t1,t2,t1r,t2r,g,w,s); return s; }
+float powerkW() {
+  float w = 0.f;
+  portENTER_CRITICAL(&mux);
+  w = dsmrData.power_delivered.val()-dsmrData.power_delivered.val() ;
+  portEXIT_CRITICAL(&mux);
+  return w;
+}
 
 float powerW() {
   float w = 0.f;
@@ -401,7 +487,6 @@ float solarW() {
 
   void onRaw(RawSink cb){ rawSink = cb; }
 
-
   struct BuildJson {
    template<typename Item>
     void apply(Item &i) {
@@ -415,21 +500,20 @@ float solarW() {
           s_fieldsDoc[Name] = value_to_json(i.val());
           // if (String(Item::unit()).length() > 0) s_fieldsDoc[Name]["unit"]  = Item::unit();
         }  //else if (!onlyIfPresent) s_fieldsDoc[Name]["value"] = "-";   
-  }
-  template<typename Item>
-  Item& value_to_json(Item& i) {
-    return i;
-  }
+    }
+    template<typename Item>
+    Item& value_to_json(Item& i) {
+      return i;
+    }
 
-  double value_to_json(TimestampedFixedValue i) {
-    return i.int_val()/1000.0;
-  }
-  
-  double value_to_json(FixedValue i) {
-    return i.int_val()/1000.0;
-  }
-
-  };
+    double value_to_json(TimestampedFixedValue i) {
+      return i.int_val()/1000.0;
+    }
+    
+    double value_to_json(FixedValue i) {
+      return i.int_val()/1000.0;
+    }
+  }; //buildJson
 
   void broadcastFields(){
     if ( !Ws::NrClients() ) return;

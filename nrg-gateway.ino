@@ -68,13 +68,15 @@ void setup() {
 }
 
 void QueueLoop(){
-  //todo in worker
+  //todo in workerqueue
+
+  //all events depending on new telegram read
   if ( !P1::newTelegram() ) return;
-  P1::clearNewTelegram();
-  // Ws::notifyRawTelegram(P1::RawTelegram);
-  Ws::broadcast("raw_telegram", [](JsonObject d){ d["text"] = P1::RawTelegram; });
+  P1::clearNewTelegram(); //mark as noticed
   Raw::broadcastLine(P1::RawTelegram + "\n");
   P1::broadcastFields();
+  Ws::notifyRawTelegram(P1::RawTelegram);
+  Debug::printf("WS clients: %u\n",Ws::NrClients());
 }
 
 void loop() {

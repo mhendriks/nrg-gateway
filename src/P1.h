@@ -4,6 +4,7 @@ TODO:
 - eigen reader of toch de proven dsmr reader gebruiken -> proven
 - detect once 
 - post processing na lezing 
+- uitgaande p1 aansturen
 
 */
 
@@ -33,6 +34,7 @@ namespace P1 {
 
   // Live (uit MyData)
   float powerW();
+  float powerkW();
   float t1kWh(); 
   float t2kWh();
   float t1rKWh(); float t2rKWh();

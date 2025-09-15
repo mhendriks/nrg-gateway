@@ -19,6 +19,8 @@
   let ws = null;
   let wantOpen = false;
   let reconnectAttempts = 0;
+  let reconnectTimer = null;
+  let connectLock = false;
   let pingTimer = null, watchdogTimer = null;
   let lastPong = 0;
   let wsUrl = null;
@@ -30,11 +32,19 @@
     return `${proto}//${location.host}/ws`;
   }
 
+  function isVisibleOnline(){
+    return document.visibilityState === 'visible' && navigator.onLine;
+  }
+
   function startHeartbeat(){
     stopHeartbeat();
     lastPong = Date.now();
-    // ping elke 20s; als >40s geen pong -> reconnect
-    pingTimer = setInterval(()=> { trySend({type:'ping', data:{ts: Date.now()}}); }, 20000);
+    // ping elke 20s; dongle antwoordt met "pong"
+    // NB: stuur top-level ts_client zodat de dongle 'm kan echo’en
+    pingTimer = setInterval(()=> {
+      trySend({ type:'ping', ts_client: Date.now() });  // <— aangepast
+    }, 20000);
+    // watchdog: als >40s geen pong -> herconnect
     watchdogTimer = setInterval(()=>{
       if (Date.now() - lastPong > 40000){
         console.warn('[DAL] WS heartbeat timeout, reconnecting');
@@ -49,9 +59,15 @@
 
   function scheduleReconnect(){
     if (!wantOpen) return;
+    if (!isVisibleOnline()) return;      // <— alleen als tab zichtbaar & online
+    if (reconnectTimer) return;          // <— al ingepland
     const base = 500, max = 15000, jitter = Math.random()*200;
     const backoff = Math.min(max, base * (2 ** reconnectAttempts)) + jitter;
-    setTimeout(connect, backoff);
+    reconnectTimer = setTimeout(()=>{
+      reconnectTimer = null;
+      connect();                         // probeert singleton-connect
+      reconnectAttempts = Math.min(reconnectAttempts + 1, 10);
+    }, backoff);
   }
 
   function flushQueue(){
@@ -66,6 +82,8 @@
       try { ws.close(); } catch(_){}
       ws = null;
     }
+    connectLock = false;                 // <— vrijgeven
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer=null; }
     if (reconnect) scheduleReconnect();
   }
 
@@ -75,8 +93,14 @@
     catch { return console.warn('[DAL] non-JSON WS payload'); }
 
     const { type, data, id } = msg || {};
-
-    if (type === 'pong'){ lastPong = Date.now(); return; }
+	
+	lastPong = Date.now(); //aways reset pong when event is received
+    
+    if (type === 'pong'){ 
+    console.log("pong received");
+//     lastPong = Date.now(); 
+    return; 
+    }
 
     // RPC result / error
     if (type === 'rpc_result' || type === 'rpc_error'){
@@ -98,28 +122,52 @@
   function connect(customUrl){
     wantOpen = true;
     wsUrl = makeUrl(customUrl || wsUrl);
+
+    // --- singleton & lifecycle guards ---
+    if (connectLock) return;                                                // <—
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return; // <—
+    if (!isVisibleOnline()) return;                                         // <—
+
+    connectLock = true;                                                     // <—
     try {
-      ws = new WebSocket(wsUrl);
-      ws.addEventListener('open', ()=>{
+      const socket = new WebSocket(wsUrl);
+
+      socket.addEventListener('open', ()=>{
+        ws = socket;
+        connectLock = false;
         reconnectAttempts = 0;
         startHeartbeat();
         flushQueue();
         emit('open');
+
+//         // (re)subscribe basis / zware topics alleen als zichtbaar
+//         trySend({ cmd: 'subscribe', topic: 'now' });
+//         if (document.visibilityState === 'visible'){
+//           trySend({ cmd: 'subscribe', topic: 'insights' });
+//           trySend({ cmd: 'subscribe', topic: 'raw_telegram' });
+//         }
       });
-      ws.addEventListener('message', handleMessage);
-      ws.addEventListener('close', ()=>{
+
+      socket.addEventListener('message', handleMessage);
+
+      socket.addEventListener('close', ()=>{
+        if (ws === socket) ws = null;
+        connectLock = false;
         emit('close');
         stopHeartbeat();
         if (wantOpen){
-          reconnectAttempts++;
           scheduleReconnect();
         }
       });
-      ws.addEventListener('error', (e)=>{
+
+      socket.addEventListener('error', (e)=>{
         emit('error', e);
-        safeClose(true);
+        // forceer snelle sluiting → 'close' plant reconnect
+        try { socket.close(); } catch(_) {}
       });
+
     } catch(e){
+      connectLock = false;
       emit('error', e);
       scheduleReconnect();
     }
@@ -184,7 +232,7 @@
   function doAction(name, params){ return rpc('action', Object.assign({ name }, params||{})); }
 
   // Directe WS send (niet-RPC)
-  function wsSend(type, data){ trySend({ type, data }); }
+  function wsSend(type, data){ trySend({ cmd: type, topic: data }); }
 
   const DAL = {
     // lifecycle
@@ -208,11 +256,26 @@
 
   // Auto-connect (uit te zetten via window.DAL_AUTO_CONNECT=false vóór deze script)
   if (global.DAL_AUTO_CONNECT !== false){
-    // geen await—gewoon verbinden zodra mogelijk
     try { connect(); } catch(e){ console.warn('[DAL] auto-connect failed', e); }
   }
 
-  // Optioneel: pauzeren bij tab verborgen (nu: niets doen, steady connection)
-  // document.addEventListener('visibilitychange', ()=>{ ... });
+  // ==== NIEUW: lifecycle hooks ====
+  // Sluit WS zodra tab verborgen is; herverbind bij zichtbaar + online
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'visible'){
+    console.log("visible");
+      wantOpen = true;
+      reconnectAttempts = 0;
+      scheduleReconnect();       // of direct connect(); maar schedule is rustiger
+    } else {
+    console.log("INvisible");
+      disconnect();              // sluit direct → voorkomt spook-sessies
+    }
+  });
+
+  window.addEventListener('online',  ()=>{ if (wantOpen) { reconnectAttempts=0; scheduleReconnect(); } });
+  window.addEventListener('offline', ()=>{ safeClose(false); });
+
+  window.addEventListener('beforeunload', ()=>{ disconnect(); });
 
 })(window);

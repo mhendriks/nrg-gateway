@@ -711,7 +711,7 @@ function refreshDashboard(json){
 
 		//-------CHECKS
 
-		SetOnSettings(json);
+// 		SetOnSettings(json);
 // 		if ( "timestamp" in json ? false : true) {
 // 			console.log("timestamp missing : p1 data incorrect!");
 // 			return;
@@ -905,11 +905,11 @@ function refreshDashboard(json){
 }
 
 //============================================================================   
-function UpdateDash()
-{	
-	console.log("Update dash");
-	objDAL.refreshFields();
-}
+// function UpdateDash()
+// {	
+// 	console.log("Update dash");
+// 	objDAL.refreshFields();
+// }
 
 //bereken verschillen gas, afname, teruglevering en totaal
 function calculateDifferences(curval, hist_arr, factor)
@@ -964,6 +964,7 @@ function DalHandleMsg(msg){
     // msg = { type, ver, ts, seq, data }
     console.debug('[WS] message:', msg.type, msg);
 //     console.debug('[WS] message - time: ', msg.ts);
+   	
    	//update time
     refreshTime(msg.ts);
 
@@ -971,9 +972,8 @@ function DalHandleMsg(msg){
     update_reconnected=true;
 	
 	switch (msg.type) {
-		case "raw_telegram":   document.getElementById("TelData").textContent = msg.data.text; break;
-// 		case "fields": SetOnSettings(msg.data); if (activeTab=="bDashTab") refreshDashboard(msg.data);else parseSmFields(msg.data); break;
-		case "fields": SetOnSettings(msg.data); if (activeTab=="bDashTab") refreshDashboard(msg.data);else parseSmFields(msg.data); break;		
+		case "raw_telegram": document.getElementById("TelData").textContent = msg.data.text; break;
+		case "fields": SetOnSettings(msg.data); if (activeTab=="bDashTab") refreshDashboard(msg.data); else if (activeTab=="bFieldsTab") parseSmFields(msg.data); break;		
 		case "devinfo": parseDeviceInfo(msg.data.text); break;
 		case "dev_settings": ParseDevSettings(); refreshSettings();break;
 		case "solar": UpdateSolar();break;
@@ -1227,11 +1227,19 @@ function SendNetSwitchJson() {
     .catch(error => console.error("Error:", error));
   }
   
+  
+  function subscribe(){
+  	console.log("subscribe test");
+  }
+  
   //============================================================================  
   // handle opening the current selected tab (from onclick menuitems)
   function openTab() {
-
+	
     console.log("openTab : " + activeTab );
+    
+    DAL.ws.send('unsubscribe', 'all' );
+    
     document.getElementById("myTopnav").className = "main-navigation"; //close dropdown menu 
     clearInterval(tabTimer);  
     clearInterval(NRGStatusTimer);
@@ -1249,21 +1257,23 @@ function SendNetSwitchJson() {
       	case "bMonthsTab"	: refreshHistData("Months"); break;
       	case "bSysInfoTab"	: refreshDevInfo(); break;
       	case "bFieldsTab":
-      		refreshSmFields();      		
-      		clearInterval(tabTimer);
-      		tabTimer = setInterval(refreshSmFields, 10 * 1000);
+//       		refreshSmFields();      		
+//       		clearInterval(tabTimer);
+//       		tabTimer = setInterval(refreshSmFields, 10 * 1000);
       		break;
       	case "bTelegramTab":
-      		refreshSmTelegram();
-      		clearInterval(tabTimer); // dont repeat!
-      		tabTimer = setInterval(refreshSmTelegram, 5 * 1000);
+//       		refreshSmTelegram();
+      		DAL.ws.send('subscribe', 'raw_telegram' );
+      		console.log("DAL.ws.send subscribe");
+//       		clearInterval(tabTimer); // dont repeat!
+//       		tabTimer = setInterval(refreshSmTelegram, 5 * 1000);
       		break;
       	case "bInfo_APIdoc": // no action
       		break;
       	case "bDashTab":
-			UpdateDash();
-			clearInterval(tabTimer);
-			tabTimer = setInterval(UpdateDash, UPDATE_ACTUAL); // repeat every 10s
+// 			UpdateDash();
+// 			clearInterval(tabTimer);
+// 			tabTimer = setInterval(UpdateDash, UPDATE_ACTUAL); // repeat every 10s
 			break;
 		case "bFSExplorer":
 		    FSExplorer();
@@ -1681,15 +1691,14 @@ function formatFailureLog(svalue) {
 }
 
   //parse the fields of the SM
-  function parseSmFields(data)
-  {
-    //console.log("parsed .., fields is ["+ JSON.stringify(data)+"]");
+function parseSmFields(data) {
+	//TODO : add unit based on defaults
+
     for (let item in data) 
     {
-      console.log("fields item: " +item);
-      console.log("fields data[item].value: " +data[item].value);
+//       data[item].humanName = td(item);
+      console.log("fields item: " + item + " value: " + data[item] + " human name: " + td(item) );
 
-      data[item].humanName = td(item);
       //get tableref
       let tableRef = document.getElementById('fieldsTable').getElementsByTagName('tbody')[0];
       //create row if not exist
@@ -1713,20 +1722,16 @@ function formatFailureLog(svalue) {
 
       //fill cells
       tableCells[0].innerHTML = item;
-      tableCells[1].innerHTML = data[item].humanName;
+      tableCells[1].innerHTML = td(item);
       switch (item) {
         case 'electricity_failure_log':          
           tableCells[0].setAttribute("style", "vertical-align: top");
           tableCells[1].setAttribute("style", "vertical-align: top");
-          tableCells[2].innerHTML = formatFailureLog(data[item].value);
+          tableCells[2].innerHTML = formatFailureLog(data[item]);
           break;
-
         case 'timestamp':
         case 'water_delivered_ts':
-        case 'gas_delivered_timestamp':
-          tableCells[2].innerHTML = formatTimestamp(data[item].value);
-          break;
-
+        case 'gas_delivered_timestamp':tableCells[2].innerHTML = formatTimestamp(data[item]);break;
         case 'equipment_id':
         case 'mbus1_equipment_id_tc':
         case 'mbus2_equipment_id_tc':
@@ -1735,27 +1740,16 @@ function formatFailureLog(svalue) {
         case 'mbus1_equipment_id_ntc':
         case 'mbus2_equipment_id_ntc':
         case 'mbus3_equipment_id_ntc':
-        case 'mbus4_equipment_id_ntc':
-          tableCells[2].innerHTML = formatIdentifier(data[item].value);
-          break;
-
-        default:
-          tableCells[2].innerHTML = data[item].value;
+        case 'mbus4_equipment_id_ntc': tableCells[2].innerHTML = formatIdentifier(data[item]);break;
+        default:tableCells[2].innerHTML = data[item];
       }
-      if (data[item].hasOwnProperty('unit')) {
-        tableCells[2].style.textAlign = "right";              // value
-        tableCells[3].style.textAlign = "center";             // unit
-        tableCells[3].innerHTML = data[item].unit;
-      }
+//       if (data[item].hasOwnProperty('unit')) {
+//         tableCells[2].style.textAlign = "right";              // value
+//         tableCells[3].style.textAlign = "center";             // unit
+//         tableCells[3].innerHTML = data[item].unit;
+//       }
     }
   }
-  
-  //============================================================================  
-  function refreshSmFields(json)
-  { 
-	objDAL.refreshFields();  
-
-  };  // refreshSmFields()
   
   //============================================================================  
   //calculate the diffs, sums and costs per entry
