@@ -34,10 +34,47 @@ void buildNow(JsonObject dst) {
   e["t2r_kwh"] = P1::t2rKWh();
 }
 
-void buildInsights(JsonObject dst) {
-  dst["uptime_s"] = millis()/1000;
-  dst["heap_free"] = (uint32_t)ESP.getFreeHeap();
-  // Voeg hier je extra “insights” velden toe die je nu al serveert
+void buildInsights(JsonObject dst){
+ 
+  if ( P1::P1Stats.I1piek != 0xFFFFFFFF ) dst["I1piek"] = P1::P1Stats.I1piek;
+  if ( P1::P1Stats.I2piek != 0xFFFFFFFF ) dst["I2piek"] = P1::P1Stats.I2piek;
+  if ( P1::P1Stats.I3piek != 0xFFFFFFFF ) dst["I3piek"] = P1::P1Stats.I3piek;
+  
+  if ( P1::P1Stats.P1min != 0xFFFFFFFF ) {
+    dst["P1max"]   = P1::P1Stats.P1max;
+    dst["P1min"]   = P1::P1Stats.P1min;
+  }
+  if ( P1::P1Stats.P2min != 0xFFFFFFFF ) {
+    dst["P2max"]   = P1::P1Stats.P2max;
+    dst["P2min"]   = P1::P1Stats.P2min;
+  }
+
+  if ( P1::P1Stats.P3min != 0xFFFFFFFF ) {
+    dst["P3max"]   = P1::P1Stats.P3max;
+    dst["P3min"]   = P1::P1Stats.P3min;
+  }
+
+  if ( P1::P1Stats.U1min != 0xFFFFFFFF ) {
+    dst["U1piek"]  = P1::P1Stats.U1piek;
+    dst["U1min"]  = P1::P1Stats.U1min;
+    dst["TU1over"] = P1::P1Stats.TU1over;
+  }
+
+  if ( P1::P1Stats.U2min != 0xFFFFFFFF ) {
+    dst["U2piek"]  = P1::P1Stats.U2piek;
+    dst["U2min"]  = P1::P1Stats.U2min;
+    dst["TU2over"] = P1::P1Stats.TU2over;
+  }
+  
+  if ( P1::P1Stats.U3min != 0xFFFFFFFF ) {
+    dst["U3piek"]  = P1::P1Stats.U3piek;
+    dst["U3min"]  = P1::P1Stats.U3min;
+    dst["TU3over"] = P1::P1Stats.TU3over;
+  }
+  
+  dst["Psluip"]  = P1::P1Stats.Psluip;
+  dst["start_time"] = P1::P1Stats.StartTime;
+
 }
 
 void buildRawTelegram(JsonObject dst, const String& text) {

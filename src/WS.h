@@ -15,7 +15,7 @@ void begin(AsyncWebServer& server);
 
 // Event helpers
 void broadcast(const char* type, std::function<void(JsonObject)> fill, size_t reserve = 1024);
-void notifyNow();
+// void notifyNow();
 void notifyInsights();
 void notifyRawTelegram(const String& raw);
 // void broadcastP1Fields();

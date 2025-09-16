@@ -43,8 +43,36 @@ namespace P1 {
 
   extern String RawTelegram;
 
+  struct Stats {
+    uint32_t StartTime = 0;
+    uint32_t U1piek = 0;
+    uint32_t U2piek = 0;
+    uint32_t U3piek = 0;
+    uint32_t U1min = 0xFFFFFFFF;
+    uint32_t U2min = 0xFFFFFFFF;
+    uint32_t U3min = 0xFFFFFFFF;  
+    uint32_t TU1over = 0;
+    uint32_t TU2over = 0;
+    uint32_t TU3over = 0;
+    uint32_t I1piek = 0xFFFFFFFF;
+    uint32_t I2piek = 0xFFFFFFFF;
+    uint32_t I3piek = 0xFFFFFFFF;
+    uint32_t Psluip = 0xFFFFFFFF;
+    uint32_t P1max  = 0;
+    uint32_t P2max  = 0;
+    uint32_t P3max  = 0;
+    uint32_t P1min   = 0xFFFFFFFF;
+    uint32_t P2min   = 0xFFFFFFFF;
+    uint32_t P3min   = 0xFFFFFFFF; 
+  };
+
+  extern Stats P1Stats;
+
   // Hooks
+  // inline const Stats& getStats() { return P1Stats; }
+  // inline Stats&       mutStats() { return P1Stats; }
   void onRaw(RawSink cb);
   void setVirtual(bool en);
   void broadcastFields();
+  void resetStats();
 }

@@ -7,6 +7,7 @@ TODO:
 #pragma once
 #include <time.h>
 #include "esp_sntp.h"
+#include "Debug.h"
 
 // --- Settings
 #define NTP_SERVER_1 "europe.pool.ntp.org"
@@ -55,4 +56,40 @@ inline void LogCurrentLocalTime() {
   } else {
     Debug::println(F("[TIME] not available"));
   }
+}
+
+// Kleine helper: huidig lokaal uur [0..23], of -1 als tijd (nog) niet plausibel
+static inline int currentLocalHour() {
+  time_t now = time(nullptr);
+  if (now < 946684800) return -1; // < 2000-01-01 -> NTP nog niet klaar
+  struct tm lt;
+  if (!localtime_r(&now, &lt)) return -1;
+  return lt.tm_hour;
+}
+
+// Lichte callback: wordt aangeroepen net NA het moment (now >= boundaryTs)
+// Argument is het "referentie-epoch" van de overgang (bv. start van het nieuwe uur/dag)
+typedef void (*time_cb_t)(time_t boundaryEpoch);
+
+namespace TimeMgr {
+
+  // ==== Lifecycle ====
+  // Call bij start na NTP init (of eerder; hij pakt zelf door zodra epoch realistisch is)
+  void begin();
+
+  // Call vaak genoeg (bv. 1 Hz in loop of vanuit je telegram-parseloop)
+  void tick();
+
+  // ==== Callbacks registreren ====
+  void onHour(time_cb_t cb);
+  void onDay(time_cb_t cb);
+
+  // ==== Status en hulpmethodes ====
+  bool hasValidTime();        // epoch > 2000-01-01 check
+  time_t nextHourTs();        // geplande volgende uurgrens (epoch, 0 indien onbekend)
+  time_t nextMidnightTs();    // geplande volgende middernacht (epoch, 0 indien onbekend)
+
+  // Optioneel flags (true precies 1 tick na overgang; reset automatisch)
+  bool consumeHourFlag();     // leest en reset de "uur gebeurde" flag
+  bool consumeDayFlag();      // leest en reset de "dag gebeurde" flag
 }

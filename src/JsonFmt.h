@@ -19,7 +19,8 @@ String stringify(Filler fill, size_t reserve = 1024);
 
 // === Builders die je nu gebruikt ===
 void buildNow(JsonObject dst);                 // /api/now + WS "now"
-void buildInsights(JsonObject dst);            // /api/insights + WS "insights"
+void buildInsights(JsonObject dst);
+// const String& buildInsights(const stats& S)
 void buildRawTelegram(JsonObject dst, const String& text);
 void buildSysInfo(JsonObject dst);             // /api/sysinfo
 void buildUpdateStatus(JsonObject dst);        // /remote-update response/progress

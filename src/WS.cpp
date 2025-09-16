@@ -142,15 +142,15 @@ void begin(AsyncWebServer& server) {
     ws.textAll(JsonFmt::wrapEvent(type, fill, reserve));
   }
 
-  void notifyNow() {
-    for (const auto& kv : subs) {
-      uint32_t id = kv.first;
-      if (!wants(id, "now")) continue;
-      if (auto* c = ws.client(id)) {
-        sendJson(c, "now", JsonFmt::buildNow, 1024);  // <-- reserve expliciet
-      }
-    }
-  }
+  // void notifyNow() {
+  //   for (const auto& kv : subs) {
+  //     uint32_t id = kv.first;
+  //     if (!wants(id, "now")) continue;
+  //     if (auto* c = ws.client(id)) {
+  //       sendJson(c, "now", JsonFmt::buildNow, 1024);
+  //     }
+  //   }
+  // }
 
   void notifyInsights() {
     for (const auto& kv : subs) {

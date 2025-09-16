@@ -32,6 +32,7 @@ TODO:
 #include "src/WS.h"
 #include "src/Raw.h"
 #include "esp_task_wdt.h"
+#include "src/Time.h"
 
 void SetupWDT(){
   esp_task_wdt_deinit();
@@ -56,15 +57,29 @@ void setup() {
   Debug::usbprintf("NRG Gateway Firmware | %s | %s - %s %s \n", Config::hostName(), FW_VERSION, __DATE__, __TIME__);
   SetupWDT();
   Led::begin();
+  Button::begin();
   Storage::begin();
   Config::load();                 // load NVS / defaults
   NetworkMgr::instance().setup(NetworkProfile::Ultra /* of WiFiOnly/EthOnly */);
+  TimeMgr::begin();
   P1::begin();                    // DSMR parser (stub)
   Web::begin();                   // HTTP + WebSockets + RAW:82
+
   // MQTT::begin();                  // connect broker, publish LWT online
-  Button::begin();                // ISR-safe, actions via queue
   // EspNow::maybeBegin();           // optional
   // OTAfw::begin();              // optional hooks
+
+  TimeMgr::onHour([](time_t boundary){
+    // boundary is start van het NIEUWE uur (lokale tijd als epoch)
+    // RNG::commitHour(boundary);
+  });
+
+  TimeMgr::onDay([](time_t boundary){
+    // RNG::commitDay(boundary);       // jouw functie
+    P1::resetStats();
+    // eventueel: meteen Insights pushen
+    // JsonFmt::buildInsights(P1Stats); Ws::notifyInsights();
+  });
 }
 
 void QueueLoop(){
@@ -76,6 +91,7 @@ void QueueLoop(){
   Raw::broadcastLine(P1::RawTelegram + "\n");
   P1::broadcastFields();
   Ws::notifyRawTelegram(P1::RawTelegram);
+  Ws::notifyInsights();
   Debug::printf("WS clients: %u\n",Ws::NrClients());
 }
 

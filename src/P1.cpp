@@ -2,6 +2,7 @@
 #include "P1.h"
 #include "Debug.h"
 #include "Config.h"
+#include "Time.h"
 #include "MyData.h"     // typedef (includes <dsmr2.h> from fork)
 #include <dsmr2.h>
 
@@ -35,6 +36,7 @@
 namespace {
   TaskHandle_t  s_task = nullptr;
   volatile bool s_run  = false;
+
 
   // DSMR v2/v5 detection state
   bool     s_pre40           = false;   // v2/v3 family (9600/7E1) if true
@@ -192,6 +194,80 @@ void PreProcess(){
   // }
 }
 
+static constexpr float U_OVER_THRESHOLD_V = 253.0f;  // 230V +10%
+  unsigned long startTijdL1 = 0;
+  unsigned long startTijdL2 = 0;
+  unsigned long startTijdL3 = 0;
+
+  bool overspanningActiefL1 = false;
+  bool overspanningActiefL2 = false;
+  bool overspanningActiefL3 = false;
+
+
+  void controleerOverspanning(int spanning, uint32_t &overspanningTotaal, unsigned long &startTijd, bool &overspanning) {
+    if (spanning >= U_OVER_THRESHOLD_V) {
+      if (!overspanning) {
+        startTijd = millis();
+        overspanning = true;
+      }
+    } else {
+      if (overspanning) {
+        overspanningTotaal += (millis() - startTijd) / 1000;
+        overspanning = false;
+      }
+    }
+  }
+
+void updateStats(){
+  // bool updated = false;
+  if (time(nullptr) < 946684800) return; //ntp not ready
+
+  if ( dsmrData.current_l1_present && ( P1::P1Stats.I1piek == 0xFFFFFFFF || dsmrData.current_l1.int_val() > P1::P1Stats.I1piek) ) P1::P1Stats.I1piek = dsmrData.current_l1.int_val();
+  if ( dsmrData.current_l2_present && ( P1::P1Stats.I2piek == 0xFFFFFFFF || dsmrData.current_l2.int_val() > P1::P1Stats.I2piek) ) P1::P1Stats.I2piek =  dsmrData.current_l2.int_val(); 
+  if ( dsmrData.current_l3_present && ( P1::P1Stats.I3piek == 0xFFFFFFFF || dsmrData.current_l3.int_val() > P1::P1Stats.I3piek) ) P1::P1Stats.I3piek =  dsmrData.current_l3.int_val();
+  
+  if ( dsmrData.power_delivered_l1_present) {
+    if ( dsmrData.power_delivered_l1.int_val() > P1::P1Stats.P1max ) P1::P1Stats.P1max = dsmrData.power_delivered_l1.int_val();
+    else if ( (int32_t)(dsmrData.power_delivered_l1.int_val() - dsmrData.power_returned_l1.int_val()) < P1::P1Stats.P1min ) P1::P1Stats.P1min = (int32_t)(dsmrData.power_delivered_l1.int_val() - dsmrData.power_returned_l1.int_val());
+  } 
+
+  if ( dsmrData.power_delivered_l2_present ) {
+      if ( dsmrData.power_delivered_l2.int_val() > P1::P1Stats.P2max ) P1::P1Stats.P2max = dsmrData.power_delivered_l2.int_val();
+      else if ( (int32_t)(dsmrData.power_delivered_l2.int_val() - dsmrData.power_returned_l2.int_val()) < P1::P1Stats.P2min ) P1::P1Stats.P2min = (int32_t)(dsmrData.power_delivered_l2.int_val() - dsmrData.power_returned_l2.int_val());
+  } 
+  
+  if ( dsmrData.power_delivered_l3_present ){
+    if ( dsmrData.power_delivered_l3.int_val() > P1::P1Stats.P3max ) P1::P1Stats.P3max = dsmrData.power_delivered_l3.int_val();
+    else if ( (int32_t)(dsmrData.power_delivered_l3.int_val() - dsmrData.power_returned_l3.int_val()) < P1::P1Stats.P3min ) P1::P1Stats.P3min = (int32_t)(dsmrData.power_delivered_l3.int_val() - dsmrData.power_returned_l3.int_val());
+  } 
+
+  if ( dsmrData.voltage_l1_present ) {
+    if ( dsmrData.voltage_l1.int_val() > P1::P1Stats.U1piek ) P1::P1Stats.U1piek = dsmrData.voltage_l1.int_val();
+    else if ( dsmrData.voltage_l1.int_val() < P1::P1Stats.U1min ) P1::P1Stats.U1min = dsmrData.voltage_l1.int_val(); 
+    controleerOverspanning(dsmrData.voltage_l1, P1::P1Stats.TU1over, startTijdL1, overspanningActiefL1);
+  } 
+
+  if ( dsmrData.voltage_l2_present ) {
+    if ( dsmrData.voltage_l2.int_val() > P1::P1Stats.U2piek ) P1::P1Stats.U2piek = dsmrData.voltage_l2.int_val(); 
+    else if ( dsmrData.voltage_l2.int_val() < P1::P1Stats.U2min ) P1::P1Stats.U2min = dsmrData.voltage_l2.int_val(); 
+    controleerOverspanning(dsmrData.voltage_l2, P1::P1Stats.TU2over, startTijdL2, overspanningActiefL2);
+  } 
+
+  if ( dsmrData.voltage_l3_present ) {
+    if ( dsmrData.voltage_l3.int_val() > P1::P1Stats.U3piek ) P1::P1Stats.U3piek = dsmrData.voltage_l3.int_val();
+    else if ( dsmrData.voltage_l3.int_val() < P1::P1Stats.U3min ) P1::P1Stats.U3min = dsmrData.voltage_l3.int_val(); 
+    controleerOverspanning(dsmrData.voltage_l3, P1::P1Stats.TU3over, startTijdL3, overspanningActiefL3);
+  } 
+
+  
+  
+  int h = currentLocalHour();
+  if ( h >= 0 && h < 5 && (dsmrData.power_delivered.int_val() < P1::P1Stats.Psluip) && dsmrData.power_delivered.int_val() ) P1::P1Stats.Psluip = dsmrData.power_delivered.int_val();
+  if ( P1::P1Stats.StartTime == 0 ) P1::P1Stats.StartTime = time(nullptr);
+  
+
+}
+
   // Parse a complete telegram; use a local MyData to avoid stale String state
   static bool parseDSMR(const char* telegram, size_t len) {
     Debug::printf("P1 parsed: %u error: %u len: %u\n", (unsigned)++p1Parsed, (unsigned)p1Error, (unsigned)len);
@@ -208,7 +284,7 @@ void PreProcess(){
     dsmrData = dsmr_new;
     if ( (p1Parsed - p1Error) == 1) ProcessOnce();
     PreProcess();
-    
+    updateStats();
     // auto keep = [](bool present, float v, float prev){ return present ? v : prev; };
     // float pwrW = s_power;
     // if (dsmr.power_delivered_present)  pwrW = dsmr.power_delivered.val() * 1000.0f;
@@ -368,6 +444,9 @@ namespace P1 {
 
   String RawTelegram;
   JsonDocument s_fieldsDoc;
+ 
+  Stats P1Stats;
+
 
   bool isV5() { return (s_P1BaudRate == 115200) && s_checksumEnabled; }
 
@@ -409,7 +488,7 @@ namespace P1 {
 float powerkW() {
   float w = 0.f;
   portENTER_CRITICAL(&mux);
-  w = dsmrData.power_delivered.val()-dsmrData.power_delivered.val() ;
+  w = dsmrData.power_delivered.val() - dsmrData.power_returned.val();
   portEXIT_CRITICAL(&mux);
   return w;
 }
@@ -519,7 +598,15 @@ float solarW() {
     if ( !Ws::NrClients() ) return;
     s_fieldsDoc.clear();
     dsmrData.applyEach(BuildJson());
+    s_fieldsDoc["power_total"] = powerkW(); //add power total
     Ws::sendWs("fields", s_fieldsDoc);
   }
 
+  void resetStats(){
+  P1Stats = {};
+  P1Stats.U1min = P1Stats.U2min = P1Stats.U3min = 0xFFFFFFFFu;
+  P1Stats.P1min = P1Stats.P2min = P1Stats.P3min = (int32_t)0xFFFFFFFF; // blijft het “meest negatief”
+  P1Stats.Psluip = 0xFFFFFFFFu;
 }
+
+} //namespace P1
