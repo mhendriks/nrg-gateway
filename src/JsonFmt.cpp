@@ -1,7 +1,10 @@
+#include "Config.h"
 #include "JsonFmt.h"
 #include "P1.h"
 #include "version.h"
 #include <LittleFS.h>
+#include "esp_chip_info.h"
+#include "WiFi.h"
 
 namespace JsonFmt {
 
@@ -24,15 +27,15 @@ String wrapEvent(const char* type, Filler fill, size_t reserve) {
   }, reserve);
 }
 
-void buildNow(JsonObject dst) {
-  dst["ts"] = (uint32_t)time(nullptr);
-  dst["power_w"] = P1::powerW();
-  JsonObject e = dst.createNestedObject("energy");
-  e["t1_kwh"]  = P1::t1kWh();
-  e["t2_kwh"]  = P1::t2kWh();
-  e["t1r_kwh"] = P1::t1rKWh();
-  e["t2r_kwh"] = P1::t2rKWh();
-}
+// void buildNow(JsonObject dst) {
+//   dst["ts"] = (uint32_t)time(nullptr);
+//   dst["power_w"] = P1::powerW();
+//   JsonObject e = dst.createNestedObject("energy");
+//   e["t1_kwh"]  = P1::t1kWh();
+//   e["t2_kwh"]  = P1::t2kWh();
+//   e["t1r_kwh"] = P1::t1rKWh();
+//   e["t2r_kwh"] = P1::t2rKWh();
+// }
 
 void buildInsights(JsonObject dst){
  
@@ -82,10 +85,45 @@ void buildRawTelegram(JsonObject dst, const String& text) {
 }
 
 void buildSysInfo(JsonObject dst) {
-  dst["version"] = FW_VERSION;
-  dst["sdk"]     = ESP.getSdkVersion();
-  dst["chip"]    = (uint32_t)ESP.getEfuseMac();
-  dst["free_heap"]= (uint32_t)ESP.getFreeHeap();
+  esp_chip_info_t chip_info;
+  esp_chip_info(&chip_info);
+
+  dst["device"]["macaddress_"] = "todo";
+  dst["device"]["freeheap_byte"] = ESP.getFreeHeap();
+  dst["device"]["chipid_"] = ESP.getEfuseMac(); //_getChipId();
+  dst["device"]["sdkversion_"] = String( ESP.getSdkVersion() );
+  dst["device"]["cpufreq_mhz"] = ESP.getCpuFreqMHz();  
+  dst["device"]["sketchsize_byte"] = (uint32_t)(ESP.getSketchSize());
+  dst["device"]["freesketchspace_byte"]  = (uint32_t)(ESP.getFreeSketchSpace());
+  dst["device"]["flashchipsize_byte"] = (uint32_t)(ESP.getFlashChipSize());
+  dst["device"]["FSsize_byte"] = (uint32_t)LittleFS.totalBytes();
+  
+  dst["build"]["fwversion_"] = FW_VERSION " ( " __DATE__ " " __TIME__ " )";
+  dst["build"]["compileoptions_"] = "[NETSW] [TODO]";
+  dst["build"]["indexfile_"] = "TODO";//settingIndexPage;
+
+  dst["runtime"]["uptime_"] = 10;//upTime();
+  dst["runtime"]["reboots_"] = 1;//(int)P1Status.reboots;
+  dst["runtime"]["lastreset_"] = "TODO";//lastReset;  
+  
+  dst["net"]["hostname_"] = Config::hostName();
+  dst["net"]["ipaddress_"] = Network.;
+
+#ifndef ETHERNET
+  dst["net"]["ssid_"] = WiFi.SSID();
+  dst["net"]["wifirssi_"] = WiFi.RSSI();
+#endif
+
+  dst["p1"]["telegramcount_"] = P1::ParseCnt;
+  dst["p1"]["telegramerrors_"] = P1::ErrorCnt;
+  dst["p1"]["v5_meter_"] = P1::isV5();
+
+  //TODO
+  // snprintf(cMsg, sizeof(cMsg), "%s:%04d", settingMQTTbroker, settingMQTTbrokerPort);
+  dst["mqtt"]["mqttbroker_"] = "192.168.2.250:2883-TODO";
+  dst["mqtt"]["mqttinterval_"] = 1;
+  dst["mqtt"]["mqttbroker_connected_"] = "TODO";//MQTTclient.connected()?"yes":"no";
+  
 }
 
 void buildUpdateStatus(JsonObject dst) {

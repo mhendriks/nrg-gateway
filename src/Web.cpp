@@ -14,9 +14,9 @@ namespace Web {
 
 AsyncWebServer& server(){ return g_srv; }
 
-static void handleNow(AsyncWebServerRequest* req){
-  req->send(200,"application/json", JsonFmt::stringify(JsonFmt::buildNow));
-}
+// static void handleNow(AsyncWebServerRequest* req){
+//   req->send(200,"application/json", JsonFmt::stringify(JsonFmt::buildNow));
+// }
 
 static void handleInsights(AsyncWebServerRequest* req){
   req->send(200,"application/json", JsonFmt::stringify(JsonFmt::buildInsights));
@@ -106,7 +106,7 @@ void begin() {
   g_srv.serveStatic("/", LittleFS, "/").setDefaultFile(indexFile).setCacheControl("max-age=86400");
 
   // REST
-  g_srv.on("/api/now", HTTP_GET, handleNow);
+  // g_srv.on("/api/now", HTTP_GET, handleNow);
   g_srv.on("/api/insights", HTTP_GET, handleInsights);
   g_srv.on("/api/sysinfo", HTTP_GET, handleSysInfo);
   g_srv.on("/api/listfiles", HTTP_GET, handleListFiles);

@@ -56,12 +56,22 @@ namespace {
     if (type == WS_EVT_DATA) {
       AwsFrameInfo* info = (AwsFrameInfo*)arg;
       if (!info->final || info->opcode != WS_TEXT || info->index!=0 || info->len!=len) return;
-
+      
       StaticJsonDocument<256> doc;
       if (deserializeJson(doc, data, len)) return;
+      
+      #ifdef DEBUG
+        Debug::println((char*) data);
+      #endif
 
       String cmd = doc["cmd"]|"", topic = doc["topic"]|"";
       const char* mtype = doc["type"] | "";
+
+      if ( cmd == "rpc"  && topic == "get_sysinfo"){
+        if (auto* c = ws.client(client->id())) {
+          sendJson(c, "sysinfo", JsonFmt::buildSysInfo, 1024);
+        }
+      }
 
       // App-niveau ping (compatibel met dal.js): accepteer {"cmd":"ping"} of {"type":"ping"}
       if (cmd == "ping" || strcmp(mtype, "ping") == 0) {

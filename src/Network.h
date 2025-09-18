@@ -60,6 +60,7 @@ public:
   bool wifiUp()   const { return (WiFi.status() == WL_CONNECTED); }
   bool ethUp()    const;
   void forgetWifiCreds(bool reboot = false);
+  String IPadress();
   
   const char* linkStr() const;  // "eth" | "wifi" | "offline"
   String      ipStr()   const;  // "x.x.x.x"

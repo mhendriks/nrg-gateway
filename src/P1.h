@@ -66,7 +66,9 @@ namespace P1 {
     uint32_t P3min   = 0xFFFFFFFF; 
   };
 
-  extern Stats P1Stats;
+  extern Stats    P1Stats;
+  extern uint32_t ErrorCnt;
+  extern uint32_t ParseCnt;
 
   // Hooks
   // inline const Stats& getStats() { return P1Stats; }

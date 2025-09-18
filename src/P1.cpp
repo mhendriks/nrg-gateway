@@ -42,9 +42,6 @@ namespace {
   bool     s_pre40           = false;   // v2/v3 family (9600/7E1) if true
   uint32_t s_P1BaudRate      = 115200;  // 9600 or 115200
   bool     s_checksumEnabled = true;    // passed into parser (v5=true, v2=false)
-  // uint32_t p1Success         = 0;
-  uint32_t p1Error           = 0;
-  uint32_t p1Parsed          = 0;
 
   // timing/heartbeat
   uint32_t _lastMs   = 0;
@@ -270,19 +267,19 @@ void updateStats(){
 
   // Parse a complete telegram; use a local MyData to avoid stale String state
   static bool parseDSMR(const char* telegram, size_t len) {
-    Debug::printf("P1 parsed: %u error: %u len: %u\n", (unsigned)++p1Parsed, (unsigned)p1Error, (unsigned)len);
+    Debug::printf("P1 parsed: %u error: %u len: %u\n", ++P1::ParseCnt, P1::ErrorCnt, (unsigned)len);
     
     MyData dsmr_new = {};
     ParseResult<void> res = P1Parser::parse(&dsmr_new, telegram, len, /*unknown_error*/false, /*checksum*/s_checksumEnabled);
     
     if (res.err) {
-      p1Error++;
+      P1::ErrorCnt++;
       Debug::println(res.fullError(telegram, telegram + len).c_str());
       return false;
     }
     
     dsmrData = dsmr_new;
-    if ( (p1Parsed - p1Error) == 1) ProcessOnce();
+    if ( (P1::ParseCnt - P1::ErrorCnt) == 1) ProcessOnce();
     PreProcess();
     updateStats();
     // auto keep = [](bool present, float v, float prev){ return present ? v : prev; };
@@ -446,6 +443,8 @@ namespace P1 {
   JsonDocument s_fieldsDoc;
  
   Stats P1Stats;
+  uint32_t ErrorCnt = 0;
+  uint32_t ParseCnt = 0;
 
 
   bool isV5() { return (s_P1BaudRate == 115200) && s_checksumEnabled; }
