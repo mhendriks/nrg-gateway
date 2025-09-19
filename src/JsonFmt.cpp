@@ -1,3 +1,4 @@
+#include "MQTT.h"
 #include "Config.h"
 #include "JsonFmt.h"
 #include "P1.h"
@@ -5,6 +6,8 @@
 #include <LittleFS.h>
 #include "esp_chip_info.h"
 #include "WiFi.h"
+#include "Network.h"
+#include "Time.h"
 
 namespace JsonFmt {
 
@@ -88,7 +91,7 @@ void buildSysInfo(JsonObject dst) {
   esp_chip_info_t chip_info;
   esp_chip_info(&chip_info);
 
-  dst["device"]["macaddress_"] = "todo";
+  dst["device"]["macaddress_"] = NetworkMgr::instance().macStr();
   dst["device"]["freeheap_byte"] = ESP.getFreeHeap();
   dst["device"]["chipid_"] = ESP.getEfuseMac(); //_getChipId();
   dst["device"]["sdkversion_"] = String( ESP.getSdkVersion() );
@@ -97,18 +100,20 @@ void buildSysInfo(JsonObject dst) {
   dst["device"]["freesketchspace_byte"]  = (uint32_t)(ESP.getFreeSketchSpace());
   dst["device"]["flashchipsize_byte"] = (uint32_t)(ESP.getFlashChipSize());
   dst["device"]["FSsize_byte"] = (uint32_t)LittleFS.totalBytes();
-  
-  dst["build"]["fwversion_"] = FW_VERSION " ( " __DATE__ " " __TIME__ " )";
-  dst["build"]["compileoptions_"] = "[NETSW] [TODO]";
-  dst["build"]["indexfile_"] = "TODO";//settingIndexPage;
+  dst["device"]["hw_model_"] = Config::hardwareClassStr();
 
-  dst["runtime"]["uptime_"] = 10;//upTime();
-  dst["runtime"]["reboots_"] = 1;//(int)P1Status.reboots;
-  dst["runtime"]["lastreset_"] = "TODO";//lastReset;  
+  dst["updates"]["fwversion_"] = FW_VERSION " ( " __DATE__ " " __TIME__ " )";
+  
+  dst["build"]["compileoptions_"] = Config::featuresString();
+  dst["build"]["indexfile_"] = Config::dev.idexfile;
+  
+
+  dst["runtime"]["uptime_"] = TimeMgr::uptime();
+  dst["runtime"]["reboots_"] = Config::dev.reboots;
+  dst["runtime"]["lastreset_"] = Config::getResetReason();
   
   dst["net"]["hostname_"] = Config::hostName();
-  dst["net"]["ipaddress_"] = Network.;
-
+  dst["net"]["ipaddress_"] = NetworkMgr::instance().ipStr();
 #ifndef ETHERNET
   dst["net"]["ssid_"] = WiFi.SSID();
   dst["net"]["wifirssi_"] = WiFi.RSSI();
@@ -120,9 +125,9 @@ void buildSysInfo(JsonObject dst) {
 
   //TODO
   // snprintf(cMsg, sizeof(cMsg), "%s:%04d", settingMQTTbroker, settingMQTTbrokerPort);
-  dst["mqtt"]["mqttbroker_"] = "192.168.2.250:2883-TODO";
-  dst["mqtt"]["mqttinterval_"] = 1;
-  dst["mqtt"]["mqttbroker_connected_"] = "TODO";//MQTTclient.connected()?"yes":"no";
+  dst["mqtt"]["mqttbroker_"] = Config::mqtt.host + ":" + String( Config::mqtt.port );
+  dst["mqtt"]["mqttinterval_sec"] = Config::mqtt.interval;
+  dst["mqtt"]["mqttbroker_connected_"] = MQTT::Connected();
   
 }
 

@@ -1,6 +1,5 @@
 #pragma once
 #define FW_NAME     "NRG Gateway"
-// #define FW_VERSION  "6.0.0"
 
 #define _VERSION_MAJOR 6
 #define _VERSION_MINOR 0

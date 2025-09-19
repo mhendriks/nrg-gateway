@@ -1,3 +1,4 @@
+#include "Debug.h"
 #include "Web.h"
 #include "Ws.h"
 #include "JsonFmt.h"
@@ -8,6 +9,7 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include "version.h"
+#include "Config.h"
 
 namespace { AsyncWebServer g_srv(80); bool g_started=false; }
 namespace Web {
@@ -50,10 +52,6 @@ static void handleRemoteUpdate(AsyncWebServerRequest* req){
   // roep je bestaande update routine aan en rapporteer status
   req->send(200,"application/json", JsonFmt::stringify(JsonFmt::buildUpdateStatus));
 }
-
-#define HOST_DATA_FILES     "cdn.jsdelivr.net"
-#define PATH_DATA_FILES     "https://cdn.jsdelivr.net/gh/mhendriks/nrg-gateway@" STR(_VERSION_MAJOR) "." STR(_VERSION_MINOR) "/data"
-#define URL_INDEX_FALLBACK  "https://cdn.jsdelivr.net/gh/mhendriks/nrg-gateway@latest/data"
 
 void GetFile(String filename, String path ){
   
@@ -99,11 +97,11 @@ void begin() {
   
   LittleFS.begin();
 
-  const char* indexFile = "/index-dev.html"; //debug
-  // const char* indexFile = "index.html"; //prod
-  checkFileExist(indexFile);
+  Debug::printf("index: %s\n", Config::dev.idexfile.c_str());
 
-  g_srv.serveStatic("/", LittleFS, "/").setDefaultFile(indexFile).setCacheControl("max-age=86400");
+  checkFileExist(Config::dev.idexfile.c_str());
+
+  g_srv.serveStatic("/", LittleFS, "/").setDefaultFile(Config::dev.idexfile.c_str()).setCacheControl("max-age=86400");
 
   // REST
   // g_srv.on("/api/now", HTTP_GET, handleNow);

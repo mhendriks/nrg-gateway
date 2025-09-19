@@ -106,4 +106,10 @@ namespace MQTT {
     String out; serializeJson(doc, out);
     mqtt.publish(t_health().c_str(), out.c_str(), false);
   }
+
+  bool Connected(){
+    //todo
+    return false;
+  }
+
 }

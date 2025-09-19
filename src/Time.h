@@ -76,6 +76,7 @@ namespace TimeMgr {
   // ==== Lifecycle ====
   // Call bij start na NTP init (of eerder; hij pakt zelf door zodra epoch realistisch is)
   void begin();
+  uint64_t uptime();
 
   // Call vaak genoeg (bv. 1 Hz in loop of vanuit je telegram-parseloop)
   void tick();

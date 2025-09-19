@@ -7,6 +7,8 @@
 static IPAddress parseIP(const String& s){ IPAddress ip; ip.fromString(s); return ip; }
 static String ipToStr(const IPAddress& ip){ return String(ip[0])+"."+ip[1]+"."+ip[2]+"."+ip[3]; }
 
+
+
 static const char FORM_HTML[] PROGMEM = R"HTML(
 <!doctype html><html lang="nl"><head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -266,6 +268,7 @@ String NetworkMgr::_apSsid() const {
   snprintf(macs, sizeof(macs), "%06X", mac);
   return String(_portal.ssid_prefix) + String(macs);
 }
+
 
 void NetworkMgr::_installRoutes() {
   _server->reset();
@@ -593,7 +596,6 @@ void NetworkMgr::_stopPortal() {
   _portalRunning = false;
 }
 
-
 const char* NetworkMgr::linkStr() const {
 #ifdef ETHERNET
   if (ethUp()) return "eth";
@@ -610,9 +612,25 @@ String NetworkMgr::ipStr() const {
   return String("0.0.0.0");
 }
 
+String NetworkMgr::macStr() const {
+  #ifdef ETHERNET
+    if ( netw_state == NW_ETH ) return ETH.macAddress().toString();
+  #endif
+  return String(WiFi.macAddress());
+}
+
+//   String _mac = MAC_Address();
+//   strcpy( macStr, _mac.c_str() );
+//   _mac.replace( ":","" );
+//   strcpy( macID, _mac.c_str() );
+//   USBPrint( "MacStr : " );USBPrintln( macStr ); //only at setup
+// //  USBSerial.print( "MacID: " );USBSerial.println( macID );
+// }
+
 int NetworkMgr::wifiRSSI() const {
   return wifiUp() ? WiFi.RSSI() : 0;
 }
+
 
 void NetworkMgr::forgetWifiCreds(bool reboot) {
   // Stop eventuele connectie/portal
@@ -641,3 +659,43 @@ void NetworkMgr::forgetWifiCreds(bool reboot) {
 
   if (reboot) { delay(50); ESP.restart(); }
 }
+
+  static inline bool isValid(const IPAddress& ip) {
+    // isSet() bestaat op ESP32 Arduino 3.x; fallback op != 0.0.0.0
+    #if ARDUINO >= 30000
+      return ip.isSet();
+    #else
+      return (ip != IPAddress(0,0,0,0));
+    #endif
+  }
+
+  IPAddress NetworkMgr::ip() {
+    // 1) Ethernet (indien aanwezig & link up)
+    #ifdef ETHERNET
+      if (ETH.linkUp()) {
+        IPAddress eth = ETH.localIP();
+        if (isValid(eth)) return eth;
+      }
+    #endif
+
+    // 2) Wi-Fi station (verbonden)
+    if (WiFi.isConnected()) {
+      IPAddress sta = WiFi.localIP();
+      if (isValid(sta)) return sta;
+    }
+
+    // 3) Wi-Fi AP (SoftAP aan)
+    if (WiFi.getMode() & WIFI_MODE_AP) {
+      IPAddress ap = WiFi.softAPIP();
+      if (isValid(ap)) return ap;
+    }
+
+    // 4) Niets actief
+    return IPAddress(0,0,0,0);
+  }
+
+  // String NetworkMgr::ipStr() {
+  //   IPAddress a = ip();
+  //   if (!isValid(a)) return String();     // lege string als geen IP
+  //   return a.toString();
+  // }

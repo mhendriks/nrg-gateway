@@ -6,7 +6,6 @@
 ***************************************************************************      
 */
 
-const APIGW = "";
 const SQUARE_M_CUBED 	   = "\u33A5";
 
 "use strict";
@@ -65,7 +64,7 @@ const SQUARE_M_CUBED 	   = "\u33A5";
   let locale 				= 'nl';  // standaard
 
 // ---- DASH
-let TotalAmps=0.0,minKW = 0.0, maxKW = 0.0,minV = 0.0, maxV = 0.0, Pmax,Gmax, Wmax;
+let TotalAmps=0.0,minV = 0.0, maxV = 0.0, Pmax,Gmax, Wmax;
 let hist_arrW=[4], hist_arrG=[4], hist_arrPa=[4], hist_arrPi=[4], hist_arrP=[4]; //berekening verbruik
 let day = 0;
 
@@ -688,16 +687,6 @@ function getclaim(){
 
 //============================================================================  
 
-function parseVersionManifest(json)
-{	
-	console.log("json.version:" + json.version + " firmwareVersion: "+ firmwareVersion);
-	if ( json.version != "" && firmwareVersion != "") {
-	  if ( firmwareVersion < (json.major*10000 + 100 * json.minor + json.fix) ) 
-		document.getElementById('message').innerHTML = "Software versie " + json.version + " beschikbaar";
-	  else document.getElementById('message').innerHTML = "";
-	}
-}
-
 function refreshDashboard(json){
 	setPresentationType('TAB'); //zet grafische mode uit
 	
@@ -782,7 +771,7 @@ function refreshDashboard(json){
 		}
 		//-------ACTUAL
 		//afname of teruglevering bepalen en signaleren
-		let TotalKW	= json.power_delivered - json.power_returned;
+		let TotalKW	= json.power_total; //json.power_delivered - json.power_returned;
 
 		if ( TotalKW <= 0 ) { 
 // 			TotalKW = -1.0 * json.power_returned.value;
@@ -838,9 +827,9 @@ function refreshDashboard(json){
 		}
 
 		//vermogen min - max bepalen
-		let nvKW= TotalKW; 
-		if (minKW == 0.0 || nvKW < minKW) { minKW = nvKW;}
-		if (nvKW> maxKW){ maxKW = nvKW; }
+// 		let nvKW= TotalKW; 
+// 		if (minKW == 0.0 || nvKW < minKW) { minKW = nvKW;}
+// 		if (nvKW> maxKW){ maxKW = nvKW; }
 				
     // stop here if there is no history enabled
 		if (!EnableHist) {Spinner(false);return;}
@@ -850,10 +839,10 @@ function refreshDashboard(json){
 		if (Dongle_Config != "p1-q") {
 
       //bereken verschillen afname, teruglevering en totaal
-      let nPA = isNaN(json.energy_delivered_tariff1) ? 0:json.energy_delivered_tariff1 + isNaN(json.energy_delivered_tariff2)?0:json.energy_delivered_tariff2;
-      let nPI = isNaN(json.energy_returned_tariff1) ? 0:json.energy_returned_tariff1  + isNaN(json.energy_returned_tariff2) ?0:json.energy_returned_tariff2;
-      Parra = calculateDifferences( nPA, hist_arrPa, 1);
-      Parri = calculateDifferences( nPI, hist_arrPi, 1);
+   //    let nPA = isNaN(json.energy_delivered_tariff1) ? 0:json.energy_delivered_tariff1 + isNaN(json.energy_delivered_tariff2)?0:json.energy_delivered_tariff2;
+//       let nPI = isNaN(json.energy_returned_tariff1) ? 0:json.energy_returned_tariff1  + isNaN(json.energy_returned_tariff2) ?0:json.energy_returned_tariff2;
+      Parra = calculateDifferences( json.energy_delivered_total, hist_arrPa, 1);
+      Parri = calculateDifferences( json.energy_returned_total, hist_arrPi, 1);
       for(let i=0;i<3;i++){ Parr[i]=Parra[i] - Parri[i]; }
 
       //dataset berekenen voor Ptotaal      
@@ -973,12 +962,21 @@ function DalHandleMsg(msg){
 	
 	switch (msg.type) {
 		case "raw_telegram": document.getElementById("TelData").textContent = msg.data.text; break;
-		case "fields": SetOnSettings(msg.data); if (activeTab=="bDashTab") refreshDashboard(msg.data); else if (activeTab=="bFieldsTab") parseSmFields(msg.data); break;		
-		case "devinfo": parseDeviceInfo(msg.data.text); break;
+		case "fields": {
+			SetOnSettings(msg.data); 
+			if (activeTab=="bDashTab") refreshDashboard(msg.data); 
+			else if (activeTab=="bFieldsTab") parseSmFields(msg.data); 
+			else if (activeTab=="bActualTab") {
+			  const data = extractActualFromFields(msg.data);
+			  showActualTable(data);
+			}
+			break;}		
+		case "insights": InsightData(msg.data);break;
+		
+		case "sysinfo": parseDeviceInfo(msg.data); break;
 		case "dev_settings": ParseDevSettings(); refreshSettings();break;
 		case "solar": UpdateSolar();break;
 		case "accu": UpdateAccu();break;
-		case "insights": InsightData(msg.data.text);break;
 		case "eid_claim":ProcessEIDClaim(msg.data.text); break;
 		case "eid_planner":ProcessEIDPlanner(msg.data.text); break;
 		case "netswitch": refreshNetSwitch(msg.data.text);break;
@@ -1246,21 +1244,26 @@ function SendNetSwitchJson() {
     hideAllCharts();
 
 	switch (activeTab) {
-		case "bActualTab" : 
-			refreshSmActual();
-			tabTimer = setInterval(refreshSmActual, UPDATE_ACTUAL );            // repeat every 10s
-      		break;
-		case "bInsightsTab"	: objDAL.refreshInsights(); break;
+// 		case "bActualTab" : 
+// 			refreshSmActual();
+// 			tabTimer = setInterval(refreshSmActual, UPDATE_ACTUAL );            // repeat every 10s
+//       		break;
+		case "bInsightsTab"	: 
+		DAL.ws.send('subscribe', 'insights' );
+// 		objDAL.refreshInsights(); 
+		break;
 		case "bPlafondTab"	: refreshData(); break;
 		case "bHoursTab"	: refreshHistData("Hours"); break;
      	case "bDaysTab"		: refreshHistData("Days"); break;
       	case "bMonthsTab"	: refreshHistData("Months"); break;
-      	case "bSysInfoTab"	: refreshDevInfo(); break;
-      	case "bFieldsTab":
+      	case "bSysInfoTab"	: 
+      		DAL.getSysInfo();
+      		break;
+//       	case "bFieldsTab":
 //       		refreshSmFields();      		
 //       		clearInterval(tabTimer);
 //       		tabTimer = setInterval(refreshSmFields, 10 * 1000);
-      		break;
+//       		break;
       	case "bTelegramTab":
 //       		refreshSmTelegram();
       		DAL.ws.send('subscribe', 'raw_telegram' );
@@ -1384,69 +1387,154 @@ function SendNetSwitchJson() {
 }
 
 
+
+function humanBytes(n){
+  if (n == null || isNaN(n)) return String(n);
+  const units = ["B","kB","MB","GB","TB"];
+  let i = 0, v = Number(n);
+  while (v >= 1024 && i < units.length-1){ v/=1024; i++; }
+  return `${v.toFixed(v<10 && i>0 ? 1 : 0)} ${units[i]}`;
+}
+
+function prettifyKey(k){
+  const clean = k.replace(/_[^_]*$/, "");
+  return td(clean);
+}
+
+function fmtValue(key, val){
+  if (val && typeof val === "object" && "value" in val){
+    const v = val.value;
+    const unit = val.unit || "";
+    return unit ? `${v} ${unit}` : v;
+  }
+  if (/_byte$/.test(key)) return humanBytes(val);
+  if (/_mhz$/.test(key)) return `${val} MHz`;
+  if (/_sec$/.test(key)) return `${val} sec`;
+  return val;
+}
+
+function addSectionRow(tbody, section, open=true){
+  const tr = document.createElement("tr");
+  tr.className = "section";
+  tr.dataset.section = section;
+  tr.innerHTML = `
+    <td colspan="2">
+      <button class="toggle" aria-expanded="${open}" data-section="${section}">${open ? "▾" : "▸"}</button>
+      <b>${prettifyKey(section)}</b>
+    </td>`;
+  tbody.appendChild(tr);
+}
+function addKVRow(tbody, section, k, v, visible){
+  const tr = document.createElement("tr");
+  tr.className = "row";
+  tr.dataset.section = section;
+  tr.style.display = visible ? "" : "none";
+  if ( k === "uptime_") v = formatDuration(v);
+  tr.innerHTML = `<td class="key">${prettifyKey(k)}</td><td class="val">${fmtValue(k,v)}</td>`;
+  tbody.appendChild(tr);
+}
+function flattenSection(obj){
+  // Als een value weer een object is zonder 'value' key, render dan nested keys met prefix
+  // (kan je uitzetten door gewoon 'Object.keys(obj)' te gebruiken)
+  const out = {};
+  for (const [k,v] of Object.entries(obj)){
+    if (v && typeof v === "object" && !("value" in v) && !Array.isArray(v)){
+      for (const [k2,v2] of Object.entries(v)){
+        out[`${k}_${k2}`] = v2;
+      }
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function parseVersionManifest(json)
+{	
+	console.log("json.version:" + json.version + " firmwareVersion: "+ firmwareVersion);
+	version_manifest = json;
+	injectVersionRows(json);
+	
+	if ( json.version != "" && firmwareVersion != "") {
+	  if ( firmwareVersion < (json.major*10000 + 100 * json.minor + json.fix) ) 
+		document.getElementById('message').innerHTML = "Software versie " + json.version + " beschikbaar";
+	  else document.getElementById('message').innerHTML = "";
+	}
+}
+
+
+function injectVersionRows(v){
+  const table = document.getElementById('devInfo');
+  if (!table) return;
+  const tbody = table.tBodies[0] || table.createTBody();
+
+	function addRow(label, htmlVal){
+	  const tr = document.createElement('tr');
+	  tr.className = 'row';
+	  tr.dataset.section = 'updates';
+	  tr.innerHTML = `<td class="key">${label}</td><td class="val">${htmlVal}</td>`;
+	
+	 const anchor = tbody.querySelector('tr.section[data-section="updates"]');
+ 	 tbody.insertBefore(tr, anchor.nextElementSibling.nextElementSibling);
+	}
+
+  // Beta
+  if (v.beta){
+    const betaLink = `<a href="#" class="doUpdate" onclick="RemoteUpdate('${v.beta}')">${v.beta} — ${t("lbl-click-update")}</a>`;
+    addRow(t('lbl-beta-fwversion'), betaLink);
+  }
+
+  // stable
+  if (v.version){
+    const stableLink = `<a href="#" class="doUpdate" onclick="RemoteUpdate('${v.version}')">${v.version} — ${t("lbl-click-update")}</a>`;
+    addRow(td('latest_version'), stableLink);
+  }
+
+}
+
 function parseDeviceInfo(obj) {
-  const tableRef = document.getElementById('tb_info');
+  const tableRef = document.getElementById('devInfo');
   tableRef.innerHTML = ""; // clear table
-  console.log("dev info compileoptions:", obj.compileoptions);
+  console.log("dev info data: ", obj);
 
   // NETSW config
-  const showNetSw = obj.compileoptions.includes("[NETSW]");
+  const showNetSw = obj.build.compileoptions_.includes("[NETSW]");
   document.getElementById("bNETSW").style.display = showNetSw ? "block" : "none";
 
-  // add version info 
-  const manifest = objDAL.version_manifest;
-  if (manifest.version) {
-    const row = tableRef.insertRow(-1);
-    row.insertCell(0).innerHTML = t("lbl-latest-fwversion");
-    row.insertCell(1).innerHTML = manifest.version;
-    row.insertCell(2).innerHTML = `<a style='color:red' onclick='RemoteUpdate("public")' href='#'>${t('lbl-install')}</a>`;
-    console.log("last version:", manifest.major * 10000 + manifest.minor * 100);
+  hw_model = obj.device.hw_model_;
+  build_version = obj.build.fwversion_;
+
+  const order = ["updates","device","build","runtime","net","p1","mqtt"]; // volgorde
+  const tbody = document.createElement("tbody");
+  tableRef.appendChild(tbody);
+
+  for (const section of order){
+    if (!obj[section]) continue;
+    // standaard open laten; pas hier per sectie aan (bijv. mqtt dicht starten)
+    const startOpen = true;
+    addSectionRow(tbody, section, startOpen);
+
+    const flat = flattenSection(obj[section]);
+    Object.keys(flat).sort().forEach(k=>{
+      addKVRow(tbody, section, k, flat[k], startOpen);
+    });
   }
+
+  // toggles
+  tableRef.addEventListener("click", (e)=>{
+    const btn = e.target.closest("button.toggle");
+    if (!btn) return;
+    const sec = btn.dataset.section;
+    const open = btn.getAttribute("aria-expanded")==="true";
+    btn.setAttribute("aria-expanded", String(!open));
+    btn.textContent = open ? "▸" : "▾";
+    tableRef.querySelectorAll(`tr.row[data-section="${sec}"]`).forEach(tr=>{
+      tr.style.display = open ? "none" : "";
+    });
+  });
   
-    if (manifest.beta) {
-    const row = tableRef.insertRow(-1);
-    row.insertCell(0).innerHTML = t("lbl-beta-fwversion");
-    row.insertCell(1).innerHTML = manifest.beta;
-    row.insertCell(2).innerHTML = `<a style='color:red' onclick='RemoteUpdate("beta")' href='#'>${t('lbl-install')}</a>`;
-  }
+    fetchDataJSON(URL_VERSION_MANIFEST+ hw_model + "/v6.json?dummy=" + Date.now(),parseVersionManifest);
 
-  // add dev info
-  for (let k in obj) {
-    const row = tableRef.insertRow(-1);
-    row.insertCell(0).innerHTML = td(k);
-
-    if (typeof obj[k] === "object") {
-      row.insertCell(1).innerHTML = obj[k].value;
-      row.insertCell(2).innerHTML = obj[k].unit;
-      row.cells[1].style.textAlign = "right";
-    } else {
-      row.insertCell(1).innerHTML = obj[k];
-      row.insertCell(2);
-    }
-
-    if (k === "fwversion") {
-      devVersion = obj[k];
-      console.log("fwversion:", devVersion);
-    }
-  }
-
-  // firmware parsing
-  document.getElementById('devVersion').innerHTML = devVersion;
-  firmwareVersion_dspl = devVersion;
-  let tmpFW = devVersion.replace("+", " ").replace("v", "");
-  const tmpX = tmpFW.split(" ")[0];
-  const [maj, min, fix] = tmpX.split(".").map(Number);
-  const firmwareVersion = maj * 10000 + min * 100 + fix;
-  console.log("tmpFW:", tmpFW);
-
-  // check for update
-  if (manifest.version) {
-    const latest = manifest.major * 10000 + manifest.minor * 100 + manifest.fix;
-//     const updateCell = tableRef.rows[0].cells[2];
-//     updateCell.innerHTML = (firmwareVersion < latest)
-//       ? `<a style='color:red' onclick='RemoteUpdate()' href='#'>${t('lbl-click-update')}</a>`
-//       : td("latest_version");
-  }
 }
     
 function closeUpdate() {
@@ -1475,9 +1563,12 @@ function UpdateStart( msg ){
 	}
 }
         
-function RemoteUpdate(type) {        
-	if ( type == "beta") document.location.href = "/remote-update?version=" + objDAL.version_manifest.beta;
-	else document.location.href = "/remote-update?version=" + objDAL.version_manifest.version;
+function RemoteUpdate(version) {        
+	console.log("remoteupdate version: " + version);
+	document.location.href = "/remote-update?version=" + version;
+// 	if ( type == "beta") 
+// 	document.location.href = "/remote-update?version=" + objDAL.version_manifest.beta;
+// 	else document.location.href = "/remote-update?version=" + objDAL.version_manifest.version;
 }
 
 function updateProgress() {
@@ -1697,7 +1788,7 @@ function parseSmFields(data) {
     for (let item in data) 
     {
 //       data[item].humanName = td(item);
-      console.log("fields item: " + item + " value: " + data[item] + " human name: " + td(item) );
+//       console.log("fields item: " + item + " value: " + data[item] + " human name: " + td(item) );
 
       //get tableref
       let tableRef = document.getElementById('fieldsTable').getElementsByTagName('tbody')[0];
@@ -2304,7 +2395,7 @@ function CopyTelegram(){
   //============================================================================  
   function setPresentationType(pType) {
     if (pType == "GRAPH") {
-      console.log("Set presentationType to GRAPHICS mode!");
+//       console.log("Set presentationType to GRAPHICS mode!");
       presentationType = pType;
       document.getElementById('aGRAPH').checked = true;
       document.getElementById('aTAB').checked   = false;
@@ -2320,7 +2411,7 @@ function CopyTelegram(){
       document.getElementById("lastMonthsTableCosts").style.display = "none";
 
     } else if (pType == "TAB") {
-      console.log("Set presentationType to Tabular mode!");
+//       console.log("Set presentationType to Tabular mode!");
       presentationType = pType;
       document.getElementById('aTAB').checked   = true;
       document.getElementById('aGRAPH').checked = false;
@@ -3134,7 +3225,7 @@ function handle_menu_click()
 
 let translations = {};
 const URL_I18N = typeof DEBUG !== 'undefined' && DEBUG
-  ? "http://localhost/~martijn/dsmr-api/v5/lang"
+  ? "http://localhost/~martijn/nrg-gateway/lang"
   : "https://cdn.jsdelivr.net/gh/mhendriks/P1-Dongel-ESP32@latest/cdn/lang";
 
 function t(key) {
@@ -3168,4 +3259,151 @@ function loadTranslations(lang) {
       applyTranslations();
     })
     .catch(err => console.error("Error fetching lang file:", err));
+}
+
+//add unit to field
+const UNIT_BY_FIELD = {
+  // tijd / id
+  timestamp: "",
+  gas_delivered_timestamp: "",
+  equipment_id: "",
+  identification: "",
+  electricity_tariff: "",
+  p1_version: "",
+  p1_version_be: "",
+  peak_pwr_last_q: "kW",
+  highest_peak_pwr: "kW",
+  highest_peak_pwr_13mnd: "kW",
+
+  // energie (tellers)
+  energy_delivered_tariff1: "kWh",
+  energy_delivered_tariff2: "kWh",
+  energy_returned_tariff1:  "kWh",
+  energy_returned_tariff2:  "kWh",
+  energy_delivered_total:   "kWh",
+  energy_returned_total:    "kWh",
+
+  // vermogen (actueel)
+  power_delivered: "kW",
+  power_returned:  "kW",
+
+  // spanning/stroom
+  voltage_l1: "V",
+  voltage_l2: "V",
+  voltage_l3: "V",
+  current_l1: "A",
+  current_l2: "A",
+  current_l3: "A",
+
+  // per-fase vermogen
+  power_delivered_l1: "kW",
+  power_delivered_l2: "kW",
+  power_delivered_l3: "kW",
+  power_returned_l1:  "kW",
+  power_returned_l2:  "kW",
+  power_returned_l3:  "kW",
+
+  // gas alias
+  gas_delivered: "m3",
+};
+
+// function inferMbusUnit(mbusDeviceType, fallback = "m3") {
+//   // Minimale, veilige inferentie:
+//   if (mbusDeviceType === 3) return "m3"; // gas
+//   if (mbusDeviceType === 7) return "L"; // water
+//   return fallback;
+// }
+
+function inferUnit(key, fields, currentUnit) {
+  if (currentUnit != null && currentUnit !== "-") return currentUnit;
+
+  // Warmtemeter (P1-Q) special case
+  if (typeof window !== "undefined" && window.Dongle_Config === "p1-q") {
+    if (key === "gas_delivered") return "GJ"; // “Warmtemeter stand” in jouw UI
+    if (/^mbus\d+_delivered$/.test(key)) return "GJ";
+  }
+
+ //  // MBUS device type heuristiek (alleen als aanwezig)
+//   const m = key.match(/^mbus(\d+)_delivered$/);
+//   if (m) {
+//     const n = m[1];
+//     const typeKey = `mbus${n}_device_type`;
+//     const tVal = fields?.[typeKey]?.value;
+//     return inferMbusUnit(tVal, UNIT_BY_FIELD[key] ?? undefined);
+//   }
+
+  // Gas alias
+//   if (key === "gas_delivered") {
+//     // Soms wordt gas ook via MBUS1 aangeleverd; als device_type=3, houd m3.
+//     const tVal = fields?.mbus1_device_type?.value;
+//     if (tVal === 3) return "m3";
+//   }
+
+  // Fallback op de statische tabel
+  return UNIT_BY_FIELD[key];
+}
+
+// normalize fields
+function normalizeField(raw) {
+  if (raw == null) return null;
+  if (typeof raw === "object") {
+    const value = ("value" in raw) ? raw.value
+               : ("v" in raw) ? raw.v
+               : raw;
+    const unit  = ("unit"  in raw) ? raw.unit
+               : ("u"     in raw) ? raw.u
+               : undefined;
+    return { value, unit };
+  }
+  return { value: raw, unit: undefined };
+}
+
+//all filtered fields
+const ACTUAL_KEYS = [
+  "timestamp",
+  "electricity_tariff",
+  "energy_delivered_tariff1",
+  "energy_delivered_tariff2",
+  "energy_returned_tariff1",
+  "energy_returned_tariff2",
+  "energy_delivered_total",
+  "energy_returned_total",
+  "power_delivered",
+  "power_returned",
+  "voltage_l1",
+  "voltage_l2",
+  "voltage_l3",
+  "current_l1",
+  "current_l2",
+  "current_l3",
+  "power_delivered_l1",
+  "power_delivered_l2",
+  "power_delivered_l3",
+  "power_returned_l1",
+  "power_returned_l2",
+  "power_returned_l3",
+  "peak_pwr_last_q",
+  "highest_peak_pwr",
+  "gas_delivered",
+  "gas_delivered_timestamp",
+  "water_delivered",
+  "water_delivered_timestamp"
+];
+
+// filter actual subset froms fields and add unit
+function extractActualFromFields(fieldsObj) {
+  const out = {};
+  if (!fieldsObj || typeof fieldsObj !== "object") return out;
+
+  for (const key of ACTUAL_KEYS) {
+    if (!(key in fieldsObj)) continue;
+
+    const norm = normalizeField(fieldsObj[key]);
+    if (!norm) continue;
+
+    // Vul unit in als die ontbreekt (met context!):
+    const unit = inferUnit(key, fieldsObj, norm.unit);
+    out[key] = { value: norm.value, unit };
+  }
+  return out;
 }

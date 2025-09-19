@@ -3,7 +3,6 @@
 
 #if  ARDUINO_USB_CDC_ON_BOOT
   #define USBSerial Serial
-  #define DEBUG
 #else 
   extern HWCDC USBSerial;
 #endif

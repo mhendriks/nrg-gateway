@@ -6,6 +6,38 @@
    - Compat-calls: getNow/getRng/getConfig/setConfig/setConfigs/remoteUpdate/reboot/getStatus/doAction
 */
 
+const APIHOST = window.location.protocol+'//'+window.location.host;
+const APIGW = APIHOST+'/api/';
+const URL_VERSION_MANIFEST 	= "http://ota.smart-stuff.nl/manifest/"
+
+const DEBUG = true;
+	
+if (!DEBUG) {	//production
+  	console.log = function () {};
+}
+
+var hw_model 				= "";
+var version_manifest=[];
+var build_version 			= "";
+
+function fetchDataJSON(url, fnHandleData) {
+      console.log("DAL::fetchDataJSON( "+url+" )");
+      fetch(url)
+      .then(response => response.json())
+      .then(json => { fnHandleData(json); })
+      .catch(function (error) {
+        console.error("fetchDataJSON(" + url + ") - " + error.message);
+//         var p = document.createElement('p');
+//         p.appendChild( document.createTextNode('Error: ' + error.message) );
+      });
+}
+
+function fetchManifest(){
+// 	this.fetchDataJSON( URL_VERSION_MANIFEST+ hw_model + "/v6.json?dummy=" + Date.now() , this.parseVersionManifest.bind(this));
+}
+
+
+
 (function(global){
   'use strict';
 
@@ -190,16 +222,16 @@
     ok ? slot.resolve(data) : slot.reject(data);
   }
 
-  function rpc(method, params = {}, opts){
+  function rpc(topic, params = {}, opts){
     const id = nextRpcId++;
     const timeoutMs = (opts && opts.timeoutMs) || 15000;
     return new Promise((resolve, reject)=>{
       const tmr = setTimeout(()=>{
         pending.delete(id);
-        reject({ error: 'timeout', method, params });
+        reject({ error: 'timeout', topic, params });
       }, timeoutMs);
       pending.set(id, { resolve, reject, tmr });
-      trySend({ type: 'rpc', id, method, params });
+      trySend({ cmd: 'rpc', id, topic, params });
     });
   }
 
@@ -223,6 +255,7 @@
   // “HTTP” → RPC vervangers
   function getNow(){ return rpc('get_now'); }
   function getRng(kind, range){ range = range || {}; return rpc('get_rng', { kind, from: range.from ?? null, to: range.to ?? null }); }
+  function getSysInfo(){ return rpc('get_sysinfo'); }
   function getConfig(){ return rpc('get_config'); }
   function setConfig(key, value){ return rpc('set_config', { key, value }); }
   function setConfigs(obj){ return rpc('set_configs', { entries: obj }); }
@@ -248,7 +281,7 @@
     // rpc
     rpc,
     // compat
-    getNow, getRng, getConfig, setConfig, setConfigs, remoteUpdate, reboot, getStatus, doAction,
+    getNow, getRng, getConfig, setConfig, setConfigs, remoteUpdate, reboot, getStatus, doAction, getSysInfo,
   };
 
   // Zet in global scope

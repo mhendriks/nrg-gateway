@@ -14,4 +14,6 @@ namespace MQTT {
   void publishState();    // nrg/<id>/state
   void publishTele();     // nrg/<id>/tele
   void publishHealth();   // nrg/<id>/health
+
+  bool Connected();
 }

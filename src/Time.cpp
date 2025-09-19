@@ -112,4 +112,6 @@ namespace TimeMgr {
 
   bool consumeHourFlag() { bool v = g_hourFlag; g_hourFlag = false; return v; }
   bool consumeDayFlag () { bool v = g_dayFlag;  g_dayFlag  = false; return v; }
+
+  uint64_t uptime() { return esp_log_timestamp()/1000; }
 }

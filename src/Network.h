@@ -60,11 +60,11 @@ public:
   bool wifiUp()   const { return (WiFi.status() == WL_CONNECTED); }
   bool ethUp()    const;
   void forgetWifiCreds(bool reboot = false);
-  String IPadress();
+  IPAddress ip();
   
   const char* linkStr() const;  // "eth" | "wifi" | "offline"
-  String      ipStr()   const;  // "x.x.x.x"
-  // (optioneel, als je 'm gebruikt ergens:)
+  String      ipStr()  const;  // "x.x.x.x"
+  String      macStr()  const;  // "aa:bb:cc:ee:ff"
   int         wifiRSSI() const; // dBm of 0 als niet op Wi-Fi
   
   // Toegang tot config (bijv. om UI te tonen)
